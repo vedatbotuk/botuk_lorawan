@@ -17,7 +17,7 @@
 #include "../credentials.h"
 
 // TEMPERATURE
-constexpr unsigned int SENSOR_PIN {7U};
+constexpr unsigned int SENSOR_PIN {47};
 AM2302::AM2302_Sensor am2302{SENSOR_PIN};
 
 /* OTAA para*/
@@ -56,7 +56,7 @@ uint8_t appSKey[] = {
 uint32_t devAddr = DEV_ADDR;
 
 /*LoraWan channelsmask, default channels 0-7*/ 
-uint16_t userChannelsMask[6]={ 0x00FF,0x0000,0x0000,0x0000,0x0000,0x0000 };
+uint16_t userChannelsMask[6]={ 0x0000,0x00FF,0x0000,0x0000,0x0000,0x0000 };
 
 /*LoraWan region, select in arduino IDE tools*/
 LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
@@ -110,6 +110,7 @@ static void prepareTxFrame( uint8_t port )
   *for example, if use REGION_CN470, 
   *the max value for different DR can be found in MaxPayloadOfDatarateCN470 refer to DataratesCN470 and BandwidthsCN470 in "RegionCN470.h".
   */
+    auto status = am2302.read();
     float temperature = (float)(am2302.get_Temperature());
     float humidity = (float)(am2302.get_Humidity());
     unsigned char *puc;
@@ -140,6 +141,18 @@ static void prepareTxFrame( uint8_t port )
 void setup() {
   Serial.begin(115200);
   Mcu.begin(HELTEC_BOARD,SLOW_CLK_TPYE);
+  // set pin and check for sensor
+  if (am2302.begin()) {
+    // this delay is needed to receive valid data,
+    // when the loop directly read again
+    delay(3000);
+  }
+  else {
+    while (true) {
+    Serial.println("Error: sensor check. => Please check sensor connection!");
+    delay(10000);
+    }
+  }
 }
 
 void loop()
