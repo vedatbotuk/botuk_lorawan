@@ -1,23 +1,26 @@
-/* Heltec Automation LoRaWAN communication example
- *
- * Function:
- * 1. Upload node data to the server using the standard LoRaWAN protocol.
- *  
- * Description:
- * 1. Communicate using LoRaWAN protocol.
- * 
- * HelTec AutoMation, Chengdu, China
- * 成都惠利特自动化科技有限公司
- * www.heltec.org
- *
- * */
+/*
+   botuk_lorawan
+   Copyright (c) 2024 Vedat Botuk.
+
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, version 3.
+
+   This program is distributed in the hope that it will be useful, but
+   WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+   General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program. If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include "LoRaWan_APP.h"
 #include <AM2302-Sensor.h>
 #include "../credentials.h"
 
-// TEMPERATURE
-constexpr unsigned int SENSOR_PIN {47};
+// TEMPERATURE HUMIDITY
+constexpr unsigned int SENSOR_PIN{48};
 AM2302::AM2302_Sensor am2302{SENSOR_PIN};
 
 /* OTAA para*/
@@ -55,17 +58,17 @@ uint8_t appSKey[] = {
 
 uint32_t devAddr = DEV_ADDR;
 
-/*LoraWan channelsmask, default channels 0-7*/ 
-uint16_t userChannelsMask[6]={ 0x0000,0x00FF,0x0000,0x0000,0x0000,0x0000 };
+/*LoraWan channelsmask, default channels 0-7*/
+uint16_t userChannelsMask[6] = {0x0000, 0x00FF, 0x0000, 0x0000, 0x0000, 0x0000};
 
 /*LoraWan region, select in arduino IDE tools*/
 LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
 
 /*LoraWan Class, Class A and Class C are supported*/
-DeviceClass_t  loraWanClass = CLASS_A;
+DeviceClass_t loraWanClass = CLASS_A;
 
 /*the application data transmission duty cycle.  value in [ms].*/
-uint32_t appTxDutyCycle = 60000;
+uint32_t appTxDutyCycle = 600000;
 
 /*OTAA or ABP*/
 bool overTheAirActivation = true;
@@ -78,126 +81,111 @@ bool isTxConfirmed = true;
 
 /* Application port */
 uint8_t appPort = 2;
-/*!
-* Number of trials to transmit the frame, if the LoRaMAC layer did not
-* receive an acknowledgment. The MAC performs a datarate adaptation,
-* according to the LoRaWAN Specification V1.0.2, chapter 18.4, according
-* to the following table:
-*
-* Transmission nb | Data Rate
-* ----------------|-----------
-* 1 (first)       | DR
-* 2               | DR
-* 3               | max(DR-1,0)
-* 4               | max(DR-1,0)
-* 5               | max(DR-2,0)
-* 6               | max(DR-2,0)
-* 7               | max(DR-3,0)
-* 8               | max(DR-3,0)
-*
-* Note, that if NbTrials is set to 1 or 2, the MAC will not decrease
-* the datarate, in case the LoRaMAC layer did not receive an acknowledgment
-*/
+
 uint8_t confirmedNbTrials = 4;
 
 /* Prepares the payload of the frame */
-static void prepareTxFrame( uint8_t port )
+static void prepareTxFrame(uint8_t port)
 {
-    /*appData size is LORAWAN_APP_DATA_MAX_SIZE which is defined in "commissioning.h".
-  *appDataSize max value is LORAWAN_APP_DATA_MAX_SIZE.
-  *if enabled AT, don't modify LORAWAN_APP_DATA_MAX_SIZE, it may cause system hanging or failure.
-  *if disabled AT, LORAWAN_APP_DATA_MAX_SIZE can be modified, the max value is reference to lorawan region and SF.
-  *for example, if use REGION_CN470, 
-  *the max value for different DR can be found in MaxPayloadOfDatarateCN470 refer to DataratesCN470 and BandwidthsCN470 in "RegionCN470.h".
-  */
-    auto status = am2302.read();
-    float temperature = (float)(am2302.get_Temperature());
-    float humidity = (float)(am2302.get_Humidity());
-    unsigned char *puc;
+  auto status = am2302.read();
 
-    puc = (unsigned char *)(&temperature);
-    appDataSize = 8;
-    appData[0] = puc[0];
-    appData[1] = puc[1];
-    appData[2] = puc[2];
-    appData[3] = puc[3];
+  float temperature = (float)(am2302.get_Temperature());
+  // Temperatur in int16 umwandeln, indem wir sie mit 100 multiplizieren und runden
+  int16_t scaledTemperature = (int16_t)(temperature * 100);
 
-    puc = (unsigned char *)(&humidity);
-    appData[4] = puc[0];
-    appData[5] = puc[1];
-    appData[6] = puc[2];
-    appData[7] = puc[3];
+  float humidity = (float)(am2302.get_Humidity());
+  uint8_t scaledHumidity = (uint8_t)(humidity + 0.5); // Runden auf nächstgelegene Ganzzahl
 
-    Serial.print("T=");
-    Serial.print(temperature);
-    Serial.print("C, RH=");
-    Serial.print(humidity);
-    Serial.print("%,");
+  unsigned char *puc;
+
+  puc = (unsigned char *)(&temperature);
+  appDataSize = 3; // Größe für 1x int16_t (2 Bytes) + 1x uint8_t (1 Byte)
+
+  // Temperatur in das Byte-Array schreiben (2 Bytes für int16_t)
+  appData[0] = (scaledTemperature >> 8) & 0xFF; // High Byte
+  appData[1] = scaledTemperature & 0xFF;        // Low Byte
+
+  // Luftfeuchtigkeit in das Byte-Array schreiben (1 Byte für uint8_t)
+  appData[2] = scaledHumidity;
+
+  // Ausgabe zur Überprüfung
+  Serial.println("Encoded Data:");
+  for (int i = 0; i < appDataSize; i++)
+  {
+    Serial.print("appData[");
+    Serial.print(i);
+    Serial.print("] = ");
+    Serial.println(appData[i], HEX);
+  }
+
+  LoRaWAN.send();
 }
 
-//if true, next uplink will add MOTE_MAC_DEVICE_TIME_REQ 
+// if true, next uplink will add MOTE_MAC_DEVICE_TIME_REQ
 
-
-void setup() {
+void setup()
+{
   Serial.begin(115200);
-  Mcu.begin(HELTEC_BOARD,SLOW_CLK_TPYE);
+  Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
   // set pin and check for sensor
-  if (am2302.begin()) {
+  if (am2302.begin())
+  {
     // this delay is needed to receive valid data,
     // when the loop directly read again
     delay(3000);
   }
-  else {
-    while (true) {
-    Serial.println("Error: sensor check. => Please check sensor connection!");
-    delay(10000);
+  else
+  {
+    while (true)
+    {
+      Serial.println("Error: sensor check. => Please check sensor connection!");
+      delay(10000);
     }
   }
 }
 
 void loop()
 {
-  switch( deviceState )
+  switch (deviceState)
   {
     case DEVICE_STATE_INIT:
-    {
-#if(LORAWAN_DEVEUI_AUTO)
-      LoRaWAN.generateDeveuiByChipID();
+      {
+#if (LORAWAN_DEVEUI_AUTO)
+        LoRaWAN.generateDeveuiByChipID();
 #endif
-      LoRaWAN.init(loraWanClass,loraWanRegion);
-      //both set join DR and DR when ADR off 
-      LoRaWAN.setDefaultDR(3);
-      break;
-    }
+        LoRaWAN.init(loraWanClass, loraWanRegion);
+        // both set join DR and DR when ADR off
+        LoRaWAN.setDefaultDR(3);
+        break;
+      }
     case DEVICE_STATE_JOIN:
-    {
-      LoRaWAN.join();
-      break;
-    }
+      {
+        LoRaWAN.join();
+        break;
+      }
     case DEVICE_STATE_SEND:
-    {
-      prepareTxFrame( appPort );
-      LoRaWAN.send();
-      deviceState = DEVICE_STATE_CYCLE;
-      break;
-    }
+      {
+        prepareTxFrame(appPort);
+        deviceState = DEVICE_STATE_CYCLE;
+        break;
+      }
     case DEVICE_STATE_CYCLE:
-    {
-      // Schedule next packet transmission
-      txDutyCycleTime = appTxDutyCycle + randr( -APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND );
-      LoRaWAN.cycle(txDutyCycleTime);
-      deviceState = DEVICE_STATE_SLEEP;
-      break;
-    }
+      {
+        // Schedule next packet transmission
+        txDutyCycleTime = appTxDutyCycle + randr(-APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND);
+        LoRaWAN.cycle(txDutyCycleTime);
+        deviceState = DEVICE_STATE_SLEEP;
+        break;
+      }
     case DEVICE_STATE_SLEEP:
-    {
-      LoRaWAN.sleep(loraWanClass);
-      break;
-    }
+      {
+        LoRaWAN.sleep(loraWanClass);
+        break;
+      }
     default:
-    {
-      deviceState = DEVICE_STATE_INIT;
-      break;
-    }
+      {
+        deviceState = DEVICE_STATE_INIT;
+        break;
+      }
   }
 }
