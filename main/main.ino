@@ -16,6 +16,7 @@
 */
 
 #include "LoRaWan_APP.h"
+#include "Wire.h"
 #include <AM2302-Sensor.h>
 #include "../credentials.h"
 
@@ -68,7 +69,7 @@ LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
 DeviceClass_t loraWanClass = CLASS_A;
 
 /*the application data transmission duty cycle.  value in [ms].*/
-uint32_t appTxDutyCycle = 600000;
+uint32_t appTxDutyCycle = 300000;
 
 /*OTAA or ABP*/
 bool overTheAirActivation = true;
@@ -99,7 +100,7 @@ static void prepareTxFrame(uint8_t port)
   unsigned char *puc;
 
   puc = (unsigned char *)(&temperature);
-  appDataSize = 3; // Größe für 1x int16_t (2 Bytes) + 1x uint8_t (1 Byte)
+  appDataSize = 6; // Größe für 1x int16_t (2 Bytes) + 1x uint8_t (1 Byte)
 
   // Temperatur in das Byte-Array schreiben (2 Bytes für int16_t)
   appData[0] = (scaledTemperature >> 8) & 0xFF; // High Byte
@@ -107,6 +108,23 @@ static void prepareTxFrame(uint8_t port)
 
   // Luftfeuchtigkeit in das Byte-Array schreiben (1 Byte für uint8_t)
   appData[2] = scaledHumidity;
+
+  // Battery
+  // read the analog / millivolts value for pin 2:
+  int16_t readValue = 0;
+  for (int i = 0; i < 4; i++) {
+    readValue += analogRead(2);
+    delay(100);
+  }
+
+  int16_t voltage = (readValue / 4);
+  uint8_t battery_percentage = calc_battery_percentage(voltage);
+  Serial.printf("ADC millivolts value = %d\n", voltage);
+  Serial.printf("Battery percentage = %d\n", battery_percentage);
+
+  appData[3] = (voltage >> 8) & 0xFF; // High Byte
+  appData[4] = voltage & 0xFF;        // Low Byte
+  appData[5] = battery_percentage;
 
   // Ausgabe zur Überprüfung
   Serial.println("Encoded Data:");
@@ -117,16 +135,15 @@ static void prepareTxFrame(uint8_t port)
     Serial.print("] = ");
     Serial.println(appData[i], HEX);
   }
-
-  LoRaWAN.send();
 }
 
 // if true, next uplink will add MOTE_MAC_DEVICE_TIME_REQ
-
 void setup()
 {
   Serial.begin(115200);
+  analogReadResolution(12);
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
+
   // set pin and check for sensor
   if (am2302.begin())
   {
@@ -166,6 +183,7 @@ void loop()
     case DEVICE_STATE_SEND:
       {
         prepareTxFrame(appPort);
+        LoRaWAN.send();
         deviceState = DEVICE_STATE_CYCLE;
         break;
       }
@@ -188,4 +206,18 @@ void loop()
         break;
       }
   }
+}
+
+#define VOLTAGE_MAX 3000
+// TODO find minimum voltage
+#define VOLTAGE_MIN 1500
+uint8_t calc_battery_percentage(int adc)
+{
+  /*For 3V no calculating is necassary*/
+  int battery_percentage = 100 * ((float)adc - VOLTAGE_MIN) / (VOLTAGE_MAX - VOLTAGE_MIN);
+
+  if (battery_percentage < 0)
+    battery_percentage = 0;
+
+  return battery_percentage;
 }
