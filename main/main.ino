@@ -69,7 +69,7 @@ LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
 DeviceClass_t loraWanClass = CLASS_A;
 
 /*the application data transmission duty cycle.  value in [ms].*/
-uint32_t appTxDutyCycle = 300000;
+uint32_t appTxDutyCycle = 30000;
 
 /*OTAA or ABP*/
 bool overTheAirActivation = true;
@@ -113,7 +113,7 @@ static void prepareTxFrame(uint8_t port)
   // read the analog / millivolts value for pin 2:
   int16_t readValue = 0;
   for (int i = 0; i < 4; i++) {
-    readValue += analogRead(2);
+    readValue += analogRead(3);
     delay(100);
   }
 
@@ -208,9 +208,9 @@ void loop()
   }
 }
 
-#define VOLTAGE_MAX 3000
+#define VOLTAGE_MAX 3700
 // TODO find minimum voltage
-#define VOLTAGE_MIN 1500
+#define VOLTAGE_MIN 3000
 uint8_t calc_battery_percentage(int adc)
 {
   /*For 3V no calculating is necassary*/
