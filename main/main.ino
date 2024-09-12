@@ -15,14 +15,22 @@
    along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <EEPROM.h>
 #include "LoRaWan_APP.h"
 #include "Wire.h"
 #include <AM2302-Sensor.h>
 #include "../credentials.h"
 
+#define EEPROM_SIZE 6  // 2 bytes for temperature (int16_t), 1 byte for humidity (uint8_t), 1 byte for battery (uint8_t)
+
 // TEMPERATURE HUMIDITY
 constexpr unsigned int SENSOR_PIN{48};
 AM2302::AM2302_Sensor am2302{SENSOR_PIN};
+
+int16_t currentTemperature;
+uint8_t currentHumidity;
+uint8_t currentBatteryPercentage;
+bool sendData = true;
 
 /* OTAA para*/
 uint8_t devEui[] = {
@@ -90,50 +98,64 @@ static void prepareTxFrame(uint8_t port)
 {
   auto status = am2302.read();
 
+  /* TEMPERATURE */
   float temperature = (float)(am2302.get_Temperature());
   // Temperatur in int16 umwandeln, indem wir sie mit 100 multiplizieren und runden
   int16_t scaledTemperature = (int16_t)(temperature * 100);
+  Serial.printf("Temperature value = %d\n", scaledTemperature);
 
+  /* HUMIDITY */
   float humidity = (float)(am2302.get_Humidity());
   uint8_t scaledHumidity = (uint8_t)(humidity + 0.5); // Runden auf nächstgelegene Ganzzahl
+  Serial.printf("Humidity value = %d\n", scaledHumidity);
 
-  unsigned char *puc;
-
-  puc = (unsigned char *)(&temperature);
-  appDataSize = 6; // Größe für 1x int16_t (2 Bytes) + 1x uint8_t (1 Byte)
-
-  // Temperatur in das Byte-Array schreiben (2 Bytes für int16_t)
-  appData[0] = (scaledTemperature >> 8) & 0xFF; // High Byte
-  appData[1] = scaledTemperature & 0xFF;        // Low Byte
-
-  // Luftfeuchtigkeit in das Byte-Array schreiben (1 Byte für uint8_t)
-  appData[2] = scaledHumidity;
-
-  // Battery
-  // read the analog / millivolts value for pin 2:
+  /* BATTERY */
   int16_t readValue = 0;
   for (int i = 0; i < 4; i++) {
     readValue += analogRead(3);
     delay(100);
   }
-
   int16_t voltage = (readValue / 4);
   uint8_t battery_percentage = calc_battery_percentage(voltage);
   Serial.printf("ADC millivolts value = %d\n", voltage);
   Serial.printf("Battery percentage = %d\n", battery_percentage);
 
-  appData[3] = (voltage >> 8) & 0xFF; // High Byte
-  appData[4] = voltage & 0xFF;        // Low Byte
-  appData[5] = battery_percentage;
+  appDataSize = 6; // Größe für 1x int16_t (2 Bytes) + 1x uint8_t (1 Byte)
 
-  // Ausgabe zur Überprüfung
-  Serial.println("Encoded Data:");
-  for (int i = 0; i < appDataSize; i++)
-  {
-    Serial.print("appData[");
-    Serial.print(i);
-    Serial.print("] = ");
-    Serial.println(appData[i], HEX);
+  if (fabs(currentTemperature - scaledTemperature) >= 50 || fabs(currentHumidity - scaledHumidity) >= 1 || fabs(currentBatteryPercentage - battery_percentage) >= 1) {
+
+    appData[0] = (currentTemperature >> 8) & 0xFF; // High Byte
+    appData[1] = currentTemperature & 0xFF;        // Low Byte
+    appData[2] = currentHumidity;
+    appData[3] = (voltage >> 8) & 0xFF; // High Byte
+    appData[4] = voltage & 0xFF;        // Low Byte
+    appData[5] = battery_percentage;
+
+    // Ausgabe zur Überprüfung
+    Serial.println("Encoded Data:");
+    for (int i = 0; i < appDataSize; i++)
+    {
+      Serial.print("appData[");
+      Serial.print(i);
+      Serial.print("] = ");
+      Serial.println(appData[i], HEX);
+    }
+
+    currentTemperature = scaledTemperature;
+    currentHumidity = scaledHumidity;
+    currentBatteryPercentage = battery_percentage;
+
+    // Write the updated values back to EEPROM
+    EEPROM.put(0, currentTemperature);  // Write 2 bytes starting from address 0
+    EEPROM.put(2, currentHumidity);     // Write 1 byte at address 2
+    EEPROM.put(3, currentBatteryPercentage);   // Write 1 byte at address 3
+    // Commit the changes to EEPROM (necessary to actually save data)
+    EEPROM.commit();
+
+    sendData = true;
+  } else {
+    Serial.println("No changes. Will not send data.");
+    sendData = false;
   }
 }
 
@@ -141,6 +163,19 @@ static void prepareTxFrame(uint8_t port)
 void setup()
 {
   Serial.begin(115200);
+
+  // Initialize EEPROM with the specified size
+  EEPROM.begin(EEPROM_SIZE);
+  // Read the stored current values from EEPROM
+  EEPROM.get(0, currentTemperature);  // Read 2 bytes starting from address 0
+  EEPROM.get(2, currentHumidity);     // Read 1 byte at address 2
+  EEPROM.get(3, currentBatteryPercentage);   // Read 1 byte at address 3
+
+  // Print the retrieved current values
+  Serial.println("Stored Temperature: " + String(currentTemperature));
+  Serial.println("Stored Humidity: " + String(currentHumidity));
+  Serial.println("Stored Battery Percentage: " + String(currentBatteryPercentage));
+
   analogReadResolution(12);
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
 
@@ -183,7 +218,9 @@ void loop()
     case DEVICE_STATE_SEND:
       {
         prepareTxFrame(appPort);
-        LoRaWAN.send();
+        if (sendData == true) {
+          LoRaWAN.send();
+        }
         deviceState = DEVICE_STATE_CYCLE;
         break;
       }
@@ -210,7 +247,7 @@ void loop()
 
 #define VOLTAGE_MAX 3700
 // TODO find minimum voltage
-#define VOLTAGE_MIN 3000
+#define VOLTAGE_MIN 2900
 uint8_t calc_battery_percentage(int adc)
 {
   /*For 3V no calculating is necassary*/
