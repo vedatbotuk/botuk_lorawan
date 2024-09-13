@@ -2,12 +2,22 @@
 This project involves development using the Wireless Stick Lite (V3) SoC, utilizing the Arduino IDE. Below you will find instructions for setting up the project, hardware information, and how to edit the configuration files.
 
 ## Hardware Overview
+The hardware setup consists of the following components:
+- **Power Supply**: 
+  - 2 x 3.7V batteries connected in parallel.
+  - A **step-down converter** to regulate voltage down to **3.3V** for powering the system.
+
+- **DHT22 Sensor**:
+  - **GPIO48** is connected to the DHT22 sensor for measuring **temperature** and **humidity**.
+
+- **Battery Monitoring**:
+  - **GPIO3** is used to measure battery level.
+  - A **voltage divider circuit** (using resistors) is connected to monitor the battery voltage safely.
+
+All components are enclosed in a **custom case**, making the system portable and protected.
+
 Below is the pinout diagram for the device:
 ![Wireless Stick Lite V3 Pinout](HTIT-WSL_V3.png)
-
-### Sensors and Pin Configurations
-- **GPIO3** is used to measure the battery level.
-- **GPIO48**: Connected to the **DHT22 sensor** for measuring **temperature** and **humidity**.
 
 ## TTN (The Things Network) Setup
 The backend for this project communicates with **The Things Network (TTN)**. Follow the steps below to set up TTN and register your device.
