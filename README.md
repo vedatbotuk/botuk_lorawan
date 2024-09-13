@@ -17,7 +17,7 @@ The hardware setup consists of the following components:
 All components are enclosed in a **custom case**, making the system portable and protected.
 
 Below is the pinout diagram for the device:
-![Wireless Stick Lite V3 Pinout](HTIT-WSL_V3.png)
+![Wireless Stick Lite V3 Pinout](img/HTIT-WSL_V3.png)
 
 ## TTN (The Things Network) Setup
 The backend for this project communicates with **The Things Network (TTN)**. Follow the steps below to set up TTN and register your device.
