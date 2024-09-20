@@ -19,6 +19,13 @@ All components are enclosed in a **custom case**, making the system portable and
 Below is the pinout diagram for the device:
 ![Wireless Stick Lite V3 Pinout](img/HTIT-WSL_V3.png)
 
+### Battery Measurement
+| Battery Level | ADC Level  |
+|---------------|------------|
+| 8.12V         | 3.5        |
+| 6.5V          | 2.6V       |
+
+
 ## TTN (The Things Network) Setup
 The backend for this project communicates with **The Things Network (TTN)**. Follow the steps below to set up TTN and register your device.
 
