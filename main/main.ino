@@ -21,7 +21,7 @@
 #include <AM2302-Sensor.h>
 #include "../credentials.h"
 
-#define EEPROM_SIZE 6  // 2 bytes for temperature (int16_t), 1 byte for humidity (uint8_t), 1 byte for battery (uint8_t)
+#define EEPROM_SIZE 6 // 2 bytes for temperature (int16_t), 1 byte for humidity (uint8_t), 1 byte for battery (uint8_t)
 
 // TEMPERATURE HUMIDITY
 constexpr unsigned int SENSOR_PIN{48};
@@ -34,36 +34,31 @@ bool sendData = true;
 
 /* OTAA para*/
 uint8_t devEui[] = {
-  DEV_EUI_0, DEV_EUI_1, DEV_EUI_2, DEV_EUI_3,
-  DEV_EUI_4, DEV_EUI_5, DEV_EUI_6, DEV_EUI_7
-};
+    DEV_EUI_0, DEV_EUI_1, DEV_EUI_2, DEV_EUI_3,
+    DEV_EUI_4, DEV_EUI_5, DEV_EUI_6, DEV_EUI_7};
 
 uint8_t appEui[] = {
-  APP_EUI_0, APP_EUI_1, APP_EUI_2, APP_EUI_3,
-  APP_EUI_4, APP_EUI_5, APP_EUI_6, APP_EUI_7
-};
+    APP_EUI_0, APP_EUI_1, APP_EUI_2, APP_EUI_3,
+    APP_EUI_4, APP_EUI_5, APP_EUI_6, APP_EUI_7};
 
 uint8_t appKey[] = {
-  APP_KEY_0, APP_KEY_1, APP_KEY_2, APP_KEY_3,
-  APP_KEY_4, APP_KEY_5, APP_KEY_6, APP_KEY_7,
-  APP_KEY_8, APP_KEY_9, APP_KEY_10, APP_KEY_11,
-  APP_KEY_12, APP_KEY_13, APP_KEY_14, APP_KEY_15
-};
+    APP_KEY_0, APP_KEY_1, APP_KEY_2, APP_KEY_3,
+    APP_KEY_4, APP_KEY_5, APP_KEY_6, APP_KEY_7,
+    APP_KEY_8, APP_KEY_9, APP_KEY_10, APP_KEY_11,
+    APP_KEY_12, APP_KEY_13, APP_KEY_14, APP_KEY_15};
 
 /* ABP para*/
 uint8_t nwkSKey[] = {
-  NWK_SKEY_0, NWK_SKEY_1, NWK_SKEY_2, NWK_SKEY_3,
-  NWK_SKEY_4, NWK_SKEY_5, NWK_SKEY_6, NWK_SKEY_7,
-  NWK_SKEY_8, NWK_SKEY_9, NWK_SKEY_10, NWK_SKEY_11,
-  NWK_SKEY_12, NWK_SKEY_13, NWK_SKEY_14, NWK_SKEY_15
-};
+    NWK_SKEY_0, NWK_SKEY_1, NWK_SKEY_2, NWK_SKEY_3,
+    NWK_SKEY_4, NWK_SKEY_5, NWK_SKEY_6, NWK_SKEY_7,
+    NWK_SKEY_8, NWK_SKEY_9, NWK_SKEY_10, NWK_SKEY_11,
+    NWK_SKEY_12, NWK_SKEY_13, NWK_SKEY_14, NWK_SKEY_15};
 
 uint8_t appSKey[] = {
-  APP_SKEY_0, APP_SKEY_1, APP_SKEY_2, APP_SKEY_3,
-  APP_SKEY_4, APP_SKEY_5, APP_SKEY_6, APP_SKEY_7,
-  APP_SKEY_8, APP_SKEY_9, APP_SKEY_10, APP_SKEY_11,
-  APP_SKEY_12, APP_SKEY_13, APP_SKEY_14, APP_SKEY_15
-};
+    APP_SKEY_0, APP_SKEY_1, APP_SKEY_2, APP_SKEY_3,
+    APP_SKEY_4, APP_SKEY_5, APP_SKEY_6, APP_SKEY_7,
+    APP_SKEY_8, APP_SKEY_9, APP_SKEY_10, APP_SKEY_11,
+    APP_SKEY_12, APP_SKEY_13, APP_SKEY_14, APP_SKEY_15};
 
 uint32_t devAddr = DEV_ADDR;
 
@@ -111,7 +106,8 @@ static void prepareTxFrame(uint8_t port)
 
   /* BATTERY */
   int16_t readValue = 0;
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 4; i++)
+  {
     readValue += analogRead(3);
     delay(100);
   }
@@ -122,7 +118,8 @@ static void prepareTxFrame(uint8_t port)
 
   appDataSize = 6; // Größe für 1x int16_t (2 Bytes) + 1x uint8_t (1 Byte)
 
-  if (fabs(currentTemperature - scaledTemperature) >= 50 || fabs(currentHumidity - scaledHumidity) >= 1 || fabs(currentBatteryPercentage - battery_percentage) >= 1) {
+  if (fabs(currentTemperature - scaledTemperature) >= 50 || fabs(currentHumidity - scaledHumidity) >= 1 || fabs(currentBatteryPercentage - battery_percentage) >= 1)
+  {
 
     appData[0] = (currentTemperature >> 8) & 0xFF; // High Byte
     appData[1] = currentTemperature & 0xFF;        // Low Byte
@@ -146,14 +143,16 @@ static void prepareTxFrame(uint8_t port)
     currentBatteryPercentage = battery_percentage;
 
     // Write the updated values back to EEPROM
-    EEPROM.put(0, currentTemperature);  // Write 2 bytes starting from address 0
-    EEPROM.put(2, currentHumidity);     // Write 1 byte at address 2
-    EEPROM.put(3, currentBatteryPercentage);   // Write 1 byte at address 3
+    EEPROM.put(0, currentTemperature);       // Write 2 bytes starting from address 0
+    EEPROM.put(2, currentHumidity);          // Write 1 byte at address 2
+    EEPROM.put(3, currentBatteryPercentage); // Write 1 byte at address 3
     // Commit the changes to EEPROM (necessary to actually save data)
     EEPROM.commit();
 
     sendData = true;
-  } else {
+  }
+  else
+  {
     Serial.println("No changes. Will not send data.");
     sendData = false;
   }
@@ -167,9 +166,9 @@ void setup()
   // Initialize EEPROM with the specified size
   EEPROM.begin(EEPROM_SIZE);
   // Read the stored current values from EEPROM
-  EEPROM.get(0, currentTemperature);  // Read 2 bytes starting from address 0
-  EEPROM.get(2, currentHumidity);     // Read 1 byte at address 2
-  EEPROM.get(3, currentBatteryPercentage);   // Read 1 byte at address 3
+  EEPROM.get(0, currentTemperature);       // Read 2 bytes starting from address 0
+  EEPROM.get(2, currentHumidity);          // Read 1 byte at address 2
+  EEPROM.get(3, currentBatteryPercentage); // Read 1 byte at address 3
 
   // Print the retrieved current values
   Serial.println("Stored Temperature: " + String(currentTemperature));
@@ -200,48 +199,49 @@ void loop()
 {
   switch (deviceState)
   {
-    case DEVICE_STATE_INIT:
-      {
+  case DEVICE_STATE_INIT:
+  {
 #if (LORAWAN_DEVEUI_AUTO)
-        LoRaWAN.generateDeveuiByChipID();
+    LoRaWAN.generateDeveuiByChipID();
 #endif
-        LoRaWAN.init(loraWanClass, loraWanRegion);
-        // both set join DR and DR when ADR off
-        LoRaWAN.setDefaultDR(3);
-        break;
-      }
-    case DEVICE_STATE_JOIN:
-      {
-        LoRaWAN.join();
-        break;
-      }
-    case DEVICE_STATE_SEND:
-      {
-        prepareTxFrame(appPort);
-        if (sendData == true) {
-          LoRaWAN.send();
-        }
-        deviceState = DEVICE_STATE_CYCLE;
-        break;
-      }
-    case DEVICE_STATE_CYCLE:
-      {
-        // Schedule next packet transmission
-        txDutyCycleTime = appTxDutyCycle + randr(-APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND);
-        LoRaWAN.cycle(txDutyCycleTime);
-        deviceState = DEVICE_STATE_SLEEP;
-        break;
-      }
-    case DEVICE_STATE_SLEEP:
-      {
-        LoRaWAN.sleep(loraWanClass);
-        break;
-      }
-    default:
-      {
-        deviceState = DEVICE_STATE_INIT;
-        break;
-      }
+    LoRaWAN.init(loraWanClass, loraWanRegion);
+    // both set join DR and DR when ADR off
+    LoRaWAN.setDefaultDR(3);
+    break;
+  }
+  case DEVICE_STATE_JOIN:
+  {
+    LoRaWAN.join();
+    break;
+  }
+  case DEVICE_STATE_SEND:
+  {
+    prepareTxFrame(appPort);
+    if (sendData == true)
+    {
+      LoRaWAN.send();
+    }
+    deviceState = DEVICE_STATE_CYCLE;
+    break;
+  }
+  case DEVICE_STATE_CYCLE:
+  {
+    // Schedule next packet transmission
+    txDutyCycleTime = appTxDutyCycle + randr(-APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND);
+    LoRaWAN.cycle(txDutyCycleTime);
+    deviceState = DEVICE_STATE_SLEEP;
+    break;
+  }
+  case DEVICE_STATE_SLEEP:
+  {
+    LoRaWAN.sleep(loraWanClass);
+    break;
+  }
+  default:
+  {
+    deviceState = DEVICE_STATE_INIT;
+    break;
+  }
   }
 }
 
