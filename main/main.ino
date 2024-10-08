@@ -109,17 +109,19 @@ static void prepareTxFrame(uint8_t port) {
   int16_t readValue = 0;
   int16_t voltage = 0;
 
-  // Every 48 cycles, read the battery voltage. When 15 min a cycle, it will
+  // Every 49 cycles, read the battery voltage. When 15 min a cycle, it will
   // be 12 hours
-  if (cycleCount % 48 == 0) {
+  if (cycleCount % 49 == 0 || cycleCount == 0) {
     for (int i = 0; i < 4; i++) {
       readValue += analogRead(3);
       delay(100);
     }
     voltage = (readValue / 4);
-    cycleCount = 0;  // Reset cycleCount after reading the voltage
+    cycleCount = 1;  // Reset cycleCount to 1 after reading the voltage
+  } else {
+    cycleCount++;
   }
-  cycleCount++;
+  EEPROM.put(4, cycleCount);  // Write cycleCount to EEPROM address 4
 
   uint8_t battery_percentage = calc_battery_percentage(voltage);
   Serial.printf("ADC millivolts value = %d\n", voltage);
@@ -155,7 +157,6 @@ static void prepareTxFrame(uint8_t port) {
     EEPROM.put(0, currentTemperature);  // Write 2 bytes starting from address 0
     EEPROM.put(2, currentHumidity);     // Write 1 byte at address 2
     EEPROM.put(3, currentBatteryPercentage);  // Write 1 byte at address 3
-    EEPROM.put(4, cycleCount);  // Write cycleCount to EEPROM address 4
     // Commit the changes to EEPROM (necessary to actually save data)
     EEPROM.commit();
 
@@ -196,8 +197,6 @@ void setup() {
 
   analogReadResolution(12);
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
-  // Set CPU frequency to 40 MHz
-  setCpuFrequencyMhz(40);
   // set pin and check for sensor
   if (am2302.begin()) {
     // this delay is needed to receive valid data,
