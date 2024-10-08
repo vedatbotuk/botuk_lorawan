@@ -106,12 +106,21 @@ static void prepareTxFrame(uint8_t port)
 
   /* BATTERY */
   int16_t readValue = 0;
-  for (int i = 0; i < 4; i++)
+  static int cycleCount = 0;
+  int16_t voltage = 0;
+
+  if (cycleCount % 10 == 0)
   {
-    readValue += analogRead(3);
-    delay(100);
+    for (int i = 0; i < 4; i++)
+    {
+      readValue += analogRead(3);
+      // We need that or not?
+      // delay(100);
+    }
+    voltage = (readValue / 4);
   }
-  int16_t voltage = (readValue / 4);
+  cycleCount++;
+
   uint8_t battery_percentage = calc_battery_percentage(voltage);
   Serial.printf("ADC millivolts value = %d\n", voltage);
   Serial.printf("Battery percentage = %d\n", battery_percentage);
