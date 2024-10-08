@@ -21,6 +21,7 @@
 #include "../credentials.h"
 #include "LoRaWan_APP.h"
 #include "Wire.h"
+#include "esp_sleep.h"  // Include the ESP32 sleep library
 
 #define EEPROM_SIZE \
   7  // 2 bytes for temperature (int16_t), 1 byte for humidity (uint8_t), 1 byte
@@ -33,7 +34,7 @@ AM2302::AM2302_Sensor am2302{SENSOR_PIN};
 int16_t currentTemperature;
 uint8_t currentHumidity;
 uint8_t currentBatteryPercentage;
-uint8_t cycleCount;
+uint8_t cycleCount = 0;
 bool sendData = true;
 
 /* OTAA para*/
@@ -71,7 +72,7 @@ LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
 DeviceClass_t loraWanClass = CLASS_A;
 
 /*the application data transmission duty cycle.  value in [ms].*/
-uint32_t appTxDutyCycle = 30000;
+uint32_t appTxDutyCycle = 900000;  // 15 minutes
 
 /*OTAA or ABP*/
 bool overTheAirActivation = true;
@@ -85,7 +86,7 @@ bool isTxConfirmed = true;
 /* Application port */
 uint8_t appPort = 2;
 
-uint8_t confirmedNbTrials = 4;
+uint8_t confirmedNbTrials = 1;
 
 /* Prepares the payload of the frame */
 static void prepareTxFrame(uint8_t port) {
@@ -108,13 +109,15 @@ static void prepareTxFrame(uint8_t port) {
   int16_t readValue = 0;
   int16_t voltage = 0;
 
-  if (cycleCount % 10 == 0) {
+  // Every 48 cycles, read the battery voltage. When 15 min a cycle, it will
+  // be 12 hours
+  if (cycleCount % 48 == 0) {
     for (int i = 0; i < 4; i++) {
       readValue += analogRead(3);
-      // We need that or not?
-      // delay(100);
+      delay(100);
     }
     voltage = (readValue / 4);
+    cycleCount = 0;  // Reset cycleCount after reading the voltage
   }
   cycleCount++;
 
@@ -127,6 +130,11 @@ static void prepareTxFrame(uint8_t port) {
   if (fabs(currentTemperature - scaledTemperature) >= 50 ||
       fabs(currentHumidity - scaledHumidity) >= 1 ||
       fabs(currentBatteryPercentage - battery_percentage) >= 1) {
+    // First refresh new values
+    currentTemperature = scaledTemperature;
+    currentHumidity = scaledHumidity;
+    currentBatteryPercentage = battery_percentage;
+
     appData[0] = (currentTemperature >> 8) & 0xFF;  // High Byte
     appData[1] = currentTemperature & 0xFF;         // Low Byte
     appData[2] = currentHumidity;
@@ -143,10 +151,6 @@ static void prepareTxFrame(uint8_t port) {
       Serial.println(appData[i], HEX);
     }
 
-    currentTemperature = scaledTemperature;
-    currentHumidity = scaledHumidity;
-    currentBatteryPercentage = battery_percentage;
-
     // Write the updated values back to EEPROM
     EEPROM.put(0, currentTemperature);  // Write 2 bytes starting from address 0
     EEPROM.put(2, currentHumidity);     // Write 1 byte at address 2
@@ -162,7 +166,17 @@ static void prepareTxFrame(uint8_t port) {
   }
 }
 
-// if true, next uplink will add MOTE_MAC_DEVICE_TIME_REQ
+/*if true, next uplink will add MOTE_MAC_DEVICE_TIME_REQ */
+void VextON(void) {
+  pinMode(Vext, OUTPUT);
+  digitalWrite(Vext, LOW);
+}
+
+void VextOFF(void) {
+  pinMode(Vext, OUTPUT);
+  digitalWrite(Vext, HIGH);
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -175,23 +189,25 @@ void setup() {
   EEPROM.get(4, cycleCount);  // Read cycleCount from EEPROM address 4
 
   // Print the retrieved current values
-  Serial.println("Stored Temperature: " + String(currentTemperature));
-  Serial.println("Stored Humidity: " + String(currentHumidity));
-  Serial.println("Stored Battery Percentage: " +
-                 String(currentBatteryPercentage));
+  // Serial.println("Stored Temperature: " + String(currentTemperature));
+  // Serial.println("Stored Humidity: " + String(currentHumidity));
+  // Serial.println("Stored Battery Percentage: " +
+  //               String(currentBatteryPercentage));
 
   analogReadResolution(12);
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
-
+  // Set CPU frequency to 40 MHz
+  setCpuFrequencyMhz(40);
   // set pin and check for sensor
   if (am2302.begin()) {
     // this delay is needed to receive valid data,
     // when the loop directly read again
-    delay(3000);
+    // Serial.println("Info: sensor check.");
+    delay(500);
   } else {
     while (true) {
       Serial.println("Error: sensor check. => Please check sensor connection!");
-      delay(10000);
+      delay(5000);
     }
   }
 }
@@ -215,10 +231,8 @@ void loop() {
       prepareTxFrame(appPort);
       if (sendData == true) {
         LoRaWAN.send();
-        deviceState = DEVICE_STATE_CYCLE;
-      } else {
-        LoRaWAN.sleep(loraWanClass);
       }
+      deviceState = DEVICE_STATE_CYCLE;
       break;
     }
     case DEVICE_STATE_CYCLE: {
