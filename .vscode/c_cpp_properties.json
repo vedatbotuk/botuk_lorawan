@@ -4,20 +4,20 @@
       "name": "ESP32S3",
       "includePath": [
         "${workspaceFolder}/**",
-        "/home/vedat/Arduino/libraries/Heltec_ESP32-master/src/esp32s3", // Pfad zur ESP32-S3 Bibliothek
-        "/home/vedat/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/cores/esp32/",
-        "/home/vedat/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/libraries/EEPROM/src/",
-        "/home/vedat/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/libraries/SPI/src/",
-        "/home/vedat/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/include/**",
-        "/home/vedat/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/qio_qspi/include/",
-        "/home/vedat/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/opi_qspi/include/",
-        "/home/vedat/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/dio_opi/include/",
-        "/home/vedat/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/qio_opi/include/",
-        "/home/vedat/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/opi_opi/include/",
-        "/home/vedat/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/dio_qspi/include/",
-        "/home/vedat/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/qio_qspi/include/",
-        "/home/vedat/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/variants/heltec_wifi_lora_32_V3/",
-        "/home/vedat/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/libraries/Wire/src/"
+        "~/Arduino/libraries/Heltec_ESP32-master/src/esp32s3", // Pfad zur ESP32-S3 Bibliothek
+        "~/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/cores/esp32/",
+        "~/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/libraries/EEPROM/src/",
+        "~/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/libraries/SPI/src/",
+        "~/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/include/**",
+        "~/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/qio_qspi/include/",
+        "~/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/opi_qspi/include/",
+        "~/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/dio_opi/include/",
+        "~/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/qio_opi/include/",
+        "~/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/opi_opi/include/",
+        "~/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/dio_qspi/include/",
+        "~/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/qio_qspi/include/",
+        "~/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/variants/heltec_wifi_lora_32_V3/",
+        "~/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/libraries/Wire/src/"
       ],
       "defines": [
         "ESP32",
@@ -36,9 +36,9 @@
       "intelliSenseMode": "gcc-x64",
       "browse": {
         "path": [
-          "/home/vedat/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/cores/esp32",
-          "/home/vedat/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/libraries",
-          "/home/vedat/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/include"
+          "~/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/cores/esp32",
+          "~/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/libraries",
+          "~/.arduino15/packages/Heltec-esp32/tools/esp32-arduino-libs/idf-release_v5.1-bd2b9390ef/esp32s3/include"
         ],
         "limitSymbolsToIncludedHeaders": true
       }
