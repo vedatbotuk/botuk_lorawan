@@ -24,18 +24,26 @@
 #include "esp_sleep.h"  // Include the ESP32 sleep library
 
 #define EEPROM_SIZE \
-  7  // 2 bytes for temperature (int16_t), 1 byte for humidity (uint8_t), 1 byte
+  7  // 2 bytes for temperature (int16_t), 1 byte for humidity (uint8_t), 1
+     // byte
      // for battery (uint8_t), 1 byte for cycleCount (uint8_t)
+
+// Treshold for sending data
+uint8_t treshBattery = 1;
+uint8_t treshTemperature = 50;
+uint8_t treshHumidity = 1;
 
 // TEMPERATURE HUMIDITY
 constexpr unsigned int SENSOR_PIN{48};
 AM2302::AM2302_Sensor am2302{SENSOR_PIN};
 
-int16_t currentTemperature;
-uint8_t currentHumidity;
-uint8_t currentBatteryPercentage;
+int16_t currentTemperature = 0;
+uint8_t currentHumidity = 0;
+int16_t voltage = 0;
+uint8_t currentBatteryPercentage = 0;
 uint8_t cycleCount = 0;
 bool sendData = true;
+bool sendBattery = true;
 
 /* OTAA para*/
 uint8_t devEui[] = {DEV_EUI_0, DEV_EUI_1, DEV_EUI_2, DEV_EUI_3,
@@ -63,7 +71,7 @@ uint8_t appSKey[] = {APP_SKEY_0,  APP_SKEY_1,  APP_SKEY_2,  APP_SKEY_3,
 uint32_t devAddr = DEV_ADDR;
 
 /*LoraWan channelsmask, default channels 0-7*/
-uint16_t userChannelsMask[6] = {0x0000, 0x00FF, 0x0000, 0x0000, 0x0000, 0x0000};
+uint16_t userChannelsMask[6] = {0x0000, 0x0000, 0x00FF, 0x0000, 0x0000, 0x0000};
 
 /*LoraWan region, select in arduino IDE tools*/
 LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
@@ -72,7 +80,7 @@ LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
 DeviceClass_t loraWanClass = CLASS_A;
 
 /*the application data transmission duty cycle.  value in [ms].*/
-uint32_t appTxDutyCycle = 900000;  // 15 minutes
+uint32_t appTxDutyCycle = 10000;  // 900000 -> 15 minutes
 
 /*OTAA or ABP*/
 bool overTheAirActivation = true;
@@ -86,7 +94,7 @@ bool isTxConfirmed = true;
 /* Application port */
 uint8_t appPort = 2;
 
-uint8_t confirmedNbTrials = 1;
+uint8_t confirmedNbTrials = 8;
 
 /* Prepares the payload of the frame */
 static void prepareTxFrame(uint8_t port) {
@@ -107,42 +115,54 @@ static void prepareTxFrame(uint8_t port) {
 
   /* BATTERY */
   int16_t readValue = 0;
-  int16_t voltage = 0;
 
-  // Every 49 cycles, read the battery voltage. When 15 min a cycle, it will
+  // Every 48 cycles, read the battery voltage. When 15 min a cycle, it will
   // be 12 hours
-  if (cycleCount % 49 == 0 || cycleCount == 0) {
-    for (int i = 0; i < 4; i++) {
-      readValue += analogRead(3);
-      delay(100);
-    }
+  // check sendBattery if true only for device start
+  if (cycleCount % 12 == 0) {
+    readValue += analogRead(3);
+    delay(100);
+    sendBattery = true;
     voltage = (readValue / 4);
-    cycleCount = 1;  // Reset cycleCount to 1 after reading the voltage
-  } else {
-    cycleCount++;
+    cycleCount = 0;  // Reset cycleCount to 0 after reading the voltage
   }
-  EEPROM.put(4, cycleCount);  // Write cycleCount to EEPROM address 4
+  cycleCount++;
+
+  Serial.printf("cycleCount value = %d\n", cycleCount);
+  Serial.printf("sendBattery value = %d\n", sendBattery);
 
   uint8_t battery_percentage = calc_battery_percentage(voltage);
   Serial.printf("ADC millivolts value = %d\n", voltage);
   Serial.printf("Battery percentage = %d\n", battery_percentage);
 
-  appDataSize = 6;  // Größe für 1x int16_t (2 Bytes) + 1x uint8_t (1 Byte)
-
-  if (fabs(currentTemperature - scaledTemperature) >= 50 ||
-      fabs(currentHumidity - scaledHumidity) >= 1 ||
-      fabs(currentBatteryPercentage - battery_percentage) >= 1) {
+  if (fabs(currentTemperature - scaledTemperature) >= treshTemperature ||
+      fabs(currentHumidity - scaledHumidity) >= treshHumidity) {
     // First refresh new values
     currentTemperature = scaledTemperature;
     currentHumidity = scaledHumidity;
     currentBatteryPercentage = battery_percentage;
 
+    if (sendBattery == true &&
+        fabs(currentBatteryPercentage - battery_percentage) >= treshBattery) {
+      appDataSize = 6;
+      Serial.println("Battery data will be sent.");
+    } else {
+      appDataSize = 3;
+      Serial.println("Battery data will not be sent.");
+    }
+
     appData[0] = (currentTemperature >> 8) & 0xFF;  // High Byte
     appData[1] = currentTemperature & 0xFF;         // Low Byte
     appData[2] = currentHumidity;
-    appData[3] = (voltage >> 8) & 0xFF;  // High Byte
-    appData[4] = voltage & 0xFF;         // Low Byte
-    appData[5] = battery_percentage;
+
+    if (sendBattery == true &&
+        fabs(currentBatteryPercentage - battery_percentage) >=
+            treshBattery) {  // Only send battery percentage if it was read
+      appData[3] = (voltage >> 8) & 0xFF;  // High Byte
+      appData[4] = voltage & 0xFF;         // Low Byte
+      appData[5] = battery_percentage;
+    }
+    sendBattery = false;
 
     // Ausgabe zur Überprüfung
     Serial.println("Encoded Data:");
@@ -156,15 +176,21 @@ static void prepareTxFrame(uint8_t port) {
     // Write the updated values back to EEPROM
     EEPROM.put(0, currentTemperature);  // Write 2 bytes starting from address 0
     EEPROM.put(2, currentHumidity);     // Write 1 byte at address 2
-    EEPROM.put(3, currentBatteryPercentage);  // Write 1 byte at address 3
-    // Commit the changes to EEPROM (necessary to actually save data)
-    EEPROM.commit();
+    EEPROM.put(3, voltage);             // Write 2 bytes starting from address 3
+    EEPROM.put(5, currentBatteryPercentage);  // Write 1 byte at address 5
+    // Address 6 is follwing next lines
+    // Address 7 is following next lines
+    // Commit is following next lines
 
     sendData = true;
   } else {
     Serial.println("No changes. Will not send data.");
     sendData = false;
   }
+  EEPROM.put(6, cycleCount);   // Write cycleCount to EEPROM address 6
+  EEPROM.put(7, sendBattery);  // Write 1 byte at address 7
+  EEPROM.commit();
+  // Commit the changes to EEPROM (necessary to actually save data)
 }
 
 /*if true, next uplink will add MOTE_MAC_DEVICE_TIME_REQ */
@@ -186,8 +212,10 @@ void setup() {
   // Read the stored current values from EEPROM
   EEPROM.get(0, currentTemperature);  // Read 2 bytes starting from address 0
   EEPROM.get(2, currentHumidity);     // Read 1 byte at address 2
-  EEPROM.get(3, currentBatteryPercentage);  // Read 1 byte at address 3
-  EEPROM.get(4, cycleCount);  // Read cycleCount from EEPROM address 4
+  EEPROM.get(3, voltage);             // Read 2 bytes starting from address 3
+  EEPROM.get(5, currentBatteryPercentage);  // Read 1 byte at address 5
+  EEPROM.get(6, cycleCount);   // Read cycleCount from EEPROM address 6
+  EEPROM.get(7, sendBattery);  // Read cycleCount from EEPROM address 7
 
   // Print the retrieved current values
   // Serial.println("Stored Temperature: " + String(currentTemperature));
