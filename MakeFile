@@ -1,0 +1,32 @@
+# Makefile for Arduino ESP32S3 (Wireless Stick Lite (V3))
+
+# Define the board and port
+BOARD := esp32:esp32:esp32s3
+PORT := /dev/ttyUSB0
+
+# Define the sketch file
+SKETCH := main/main.ino
+
+# Define the Arduino CLI command
+ARDUINO_CLI := arduino-cli
+
+# Compile the sketch
+compile:
+	$(ARDUINO_CLI) compile --fqbn $(BOARD) $(SKETCH)
+
+# Upload the sketch to the board
+upload:
+	$(ARDUINO_CLI) upload -p $(PORT) --fqbn $(BOARD) $(SKETCH)
+
+# Monitor the serial output
+monitor:
+	$(ARDUINO_CLI) monitor -p $(PORT)
+
+# Clean the build files
+clean:
+	rm -rf $(SKETCH).arduino*
+
+# Default target
+all: compile upload
+
+.PHONY: compile upload monitor clean all

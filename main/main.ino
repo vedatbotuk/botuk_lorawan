@@ -1,18 +1,18 @@
 /*
-   botuk_lorawan
-   Copyright (c) 2024 Vedat Botuk.
+  botuk_lorawan
+  Copyright (c) 2024 Vedat Botuk.
 
-   This program is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, version 3.
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, version 3.
 
-   This program is distributed in the hope that it will be useful, but
-   WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-   General Public License for more details.
+  This program is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+  General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program. If not, see <http://www.gnu.org/licenses/>.
+  You should have received a copy of the GNU General Public License
+  along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <AM2302-Sensor.h>
@@ -22,17 +22,15 @@
 #include "LoRaWan_APP.h"
 #include "Wire.h"
 
-#define EEPROM_SIZE \
-  7  // 2 bytes for temperature (int16_t), 1 byte for humidity (uint8_t), 1
-     // byte
-     // for battery (uint8_t), 1 byte for cycleCount (uint8_t)
+constexpr uint8_t EEPROM_SIZE = 7;
+constexpr uint8_t TRESH_BATTERY = 1;
+constexpr uint8_t TRESH_TEMPERATURE = 100;
+constexpr uint8_t TRESH_HUMIDITY = 2;
+constexpr unsigned int SENSOR_PIN = 48;
+constexpr uint32_t APP_TX_DUTY_CYCLE = 900000;  // 15 minutes
+constexpr uint8_t VOLTAGE_MAX = 3700;
+constexpr uint8_t VOLTAGE_MIN = 2900;
 
-// Treshold for sending data
-uint8_t treshBattery = 1;
-uint8_t treshTemperature = 100;
-uint8_t treshHumidity = 2;
-
-constexpr unsigned int SENSOR_PIN{48};
 AM2302::AM2302_Sensor am2302{SENSOR_PIN};
 
 int16_t currentTemperature;
@@ -73,19 +71,17 @@ uint32_t devAddr = DEV_ADDR;
 uint16_t userChannelsMask[6] = {0x0000, 0x0000, 0x00FF, 0x0000, 0x0000, 0x0000};
 
 /*LoraWan region, select in arduino IDE tools*/
-
 LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
 DeviceClass_t loraWanClass = CLASS_A;
 
 /*the application data transmission duty cycle.  value in [ms].*/
-uint32_t appTxDutyCycle = 900000;  // 900000 -> 15 minutes
+uint32_t appTxDutyCycle = APP_TX_DUTY_CYCLE;
 
 /*OTAA or ABP*/
 bool overTheAirActivation = true;
 bool loraWanAdr = true;
 bool isTxConfirmed = true;
 uint8_t appPort = 2;
-
 uint8_t confirmedNbTrials = 2;
 
 /* Prepares the payload of the frame */
@@ -93,95 +89,78 @@ static void prepareTxFrame(uint8_t port) {
   auto status = am2302.read();
 
   /* TEMPERATURE */
-  float temperature = (float)(am2302.get_Temperature());
-  // Temperatur in int16 umwandeln, indem wir sie mit 100 multiplizieren und
-  // runden
-  int16_t scaledTemperature = (int16_t)(temperature * 100);
-
+  float temperature = static_cast<float>(am2302.get_Temperature());
+  int16_t scaledTemperature = static_cast<int16_t>(temperature * 100);
   Serial.printf("Temperature value = %d\n", scaledTemperature);
 
   /* HUMIDITY */
-  float humidity = (float)(am2302.get_Humidity());
-  uint8_t scaledHumidity =
-      (uint8_t)(humidity + 0.5);  // Runden auf nächstgelegene Ganzzahl
-
+  float humidity = static_cast<float>(am2302.get_Humidity());
+  uint8_t scaledHumidity = static_cast<uint8_t>(humidity + 0.5);
   Serial.printf("Humidity value = %d\n", scaledHumidity);
 
   /* BATTERY */
 
   // Every 48 cycles, read the battery voltage. When 15 min a cycle, it will
   // be 12 hours
-  // check sendBattery if true only for device start
   if (cycleCount % 48 == 0) {
     int16_t readValue = 0;
     for (int i = 0; i < 4; i++) {
       readValue += analogRead(3);
       delay(100);
     }
-    voltage = (readValue / 4);
+    voltage = readValue / 4;
     battery_percentage = calc_battery_percentage(voltage);
 
     Serial.printf("ADC millivolts value = %d\n", voltage);
     Serial.printf("Battery percentage = %d\n", battery_percentage);
 
-    if (fabs(currentBatteryPercentage - battery_percentage) >= treshBattery) {
+    if (fabs(currentBatteryPercentage - battery_percentage) >= TRESH_BATTERY) {
       currentBatteryPercentage = battery_percentage;
       sendBattery = true;
-      EEPROM.put(3, voltage);  // Write 2 bytes starting from address 3
-      EEPROM.put(5, currentBatteryPercentage);  // Write 1 byte at address 5
+      EEPROM.put(3, voltage);
+      EEPROM.put(5, currentBatteryPercentage);
       EEPROM.commit();
     }
 
-    cycleCount = 0;  // Reset cycleCount to 0 after reading the voltage
+    cycleCount = 0;
   }
   cycleCount++;
-  EEPROM.put(6, cycleCount);  // Write cycleCount to EEPROM address 6
+  EEPROM.put(6, cycleCount);
   EEPROM.commit();
 
   Serial.printf("cycleCount value = %d\n", cycleCount);
   Serial.printf("sendBattery value = %d\n", sendBattery);
 
-  if (fabs(currentTemperature - scaledTemperature) >= treshTemperature ||
-      fabs(currentHumidity - scaledHumidity) >= treshHumidity) {
+  if (fabs(currentTemperature - scaledTemperature) >= TRESH_TEMPERATURE ||
+      fabs(currentHumidity - scaledHumidity) >= TRESH_HUMIDITY) {
     sendData = true;
-
-    // First refresh new values
     currentTemperature = scaledTemperature;
     currentHumidity = scaledHumidity;
-    // Write the updated values back to EEPROM
-    EEPROM.put(0, currentTemperature);  // Write 2 bytes starting from address 0
-    EEPROM.put(2, currentHumidity);     // Write 1 byte at address 2
-    EEPROM.put(7, sendBattery);         // Write 1 byte at address 7
+    EEPROM.put(0, currentTemperature);
+    EEPROM.put(2, currentHumidity);
+    EEPROM.put(7, sendBattery);
     EEPROM.commit();
 
-    if (sendBattery == true) {
-      appDataSize = 6;
-      Serial.println("Battery data will be sent.");
-    } else {
-      appDataSize = 3;
-      Serial.println("Battery data will not be sent.");
-    }
+    appDataSize = sendBattery ? 6 : 3;
+    Serial.println(sendBattery ? "Battery data will be sent."
+                               : "Battery data will not be sent.");
 
-    appData[0] = (currentTemperature >> 8) & 0xFF;  // High Byte
-    appData[1] = currentTemperature & 0xFF;         // Low Byte
+    appData[0] = (currentTemperature >> 8) & 0xFF;
+    appData[1] = currentTemperature & 0xFF;
     appData[2] = currentHumidity;
 
-    if (sendBattery == true) {  // Only send battery percentage if it was read
-      appData[3] = (voltage >> 8) & 0xFF;  // High Byte
-      appData[4] = voltage & 0xFF;         // Low Byte
+    if (sendBattery) {
+      appData[3] = (voltage >> 8) & 0xFF;
+      appData[4] = voltage & 0xFF;
       appData[5] = battery_percentage;
     }
     sendBattery = false;
-    EEPROM.put(7, sendBattery);  // Write 1 byte at address 7
+    EEPROM.put(7, sendBattery);
     EEPROM.commit();
 
-    // Print encoded data for verification
     Serial.println("Encoded Data:");
     for (int i = 0; i < appDataSize; i++) {
-      Serial.print("appData[");
-      Serial.print(i);
-      Serial.print("] = ");
-      Serial.println(appData[i], HEX);
+      Serial.printf("appData[%d] = %02X\n", i, appData[i]);
     }
   } else {
     Serial.println("No changes detected. Data will not be sent.");
@@ -189,13 +168,12 @@ static void prepareTxFrame(uint8_t port) {
   }
 }
 
-/*if true, next uplink will add MOTE_MAC_DEVICE_TIME_REQ */
-void VextON(void) {
+void VextON() {
   pinMode(Vext, OUTPUT);
   digitalWrite(Vext, LOW);
 }
 
-void VextOFF(void) {
+void VextOFF() {
   pinMode(Vext, OUTPUT);
   digitalWrite(Vext, HIGH);
 }
@@ -203,29 +181,22 @@ void VextOFF(void) {
 void setup() {
   Serial.begin(115200);
 
-  // Initialize EEPROM
   EEPROM.begin(EEPROM_SIZE);
-  // Read the stored current values from EEPROM
-  EEPROM.get(0, currentTemperature);  // Read 2 bytes starting from address 0
-  EEPROM.get(2, currentHumidity);     // Read 1 byte at address 2
-  EEPROM.get(3, voltage);             // Read 2 bytes starting from address 3
-  EEPROM.get(5, currentBatteryPercentage);  // Read 1 byte at address 5
-  EEPROM.get(6, cycleCount);   // Read cycleCount from EEPROM address 6
-  EEPROM.get(7, sendBattery);  // Read cycleCount from EEPROM address 7
+  EEPROM.get(0, currentTemperature);
+  EEPROM.get(2, currentHumidity);
+  EEPROM.get(3, voltage);
+  EEPROM.get(5, currentBatteryPercentage);
+  EEPROM.get(6, cycleCount);
+  EEPROM.get(7, sendBattery);
 
-  // Print the retrieved current values
-  Serial.println("Stored Temperature: " + String(currentTemperature));
-  Serial.println("Stored Humidity: " + String(currentHumidity));
-  Serial.println("Stored Battery Percentage: " +
-                 String(currentBatteryPercentage));
+  Serial.printf("Stored Temperature: %d\n", currentTemperature);
+  Serial.printf("Stored Humidity: %d\n", currentHumidity);
+  Serial.printf("Stored Battery Percentage: %d\n", currentBatteryPercentage);
 
   analogReadResolution(12);
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
-  // set pin and check for sensor
+
   if (am2302.begin()) {
-    // this delay is needed to receive valid data,
-    // when the loop directly read again
-    // Serial.println("Info: sensor check.");
     delay(500);
   } else {
     while (true) {
@@ -237,54 +208,45 @@ void setup() {
 
 void loop() {
   switch (deviceState) {
-    case DEVICE_STATE_INIT: {
+    case DEVICE_STATE_INIT:
 #if (LORAWAN_DEVEUI_AUTO)
       LoRaWAN.generateDeveuiByChipID();
 #endif
       LoRaWAN.init(loraWanClass, loraWanRegion);
-      // both set join DR and DR when ADR off
       LoRaWAN.setDefaultDR(3);
       break;
-    }
-    case DEVICE_STATE_JOIN: {
+
+    case DEVICE_STATE_JOIN:
       LoRaWAN.join();
       break;
-    }
-    case DEVICE_STATE_SEND: {
+
+    case DEVICE_STATE_SEND:
       prepareTxFrame(appPort);
-      if (sendData == true) {
+      if (sendData) {
         LoRaWAN.send();
       }
       deviceState = DEVICE_STATE_CYCLE;
       break;
-    }
-    case DEVICE_STATE_CYCLE: {
-      // Schedule next packet transmission
+
+    case DEVICE_STATE_CYCLE:
       txDutyCycleTime =
           appTxDutyCycle + randr(-APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND);
       LoRaWAN.cycle(txDutyCycleTime);
       deviceState = DEVICE_STATE_SLEEP;
       break;
-    }
-    case DEVICE_STATE_SLEEP: {
+
+    case DEVICE_STATE_SLEEP:
       LoRaWAN.sleep(loraWanClass);
       break;
-    }
-    default: {
+
+    default:
       deviceState = DEVICE_STATE_INIT;
       break;
-    }
   }
 }
 
-#define VOLTAGE_MAX 3700
-// TODO find minimum voltage
-#define VOLTAGE_MIN 2900
 uint8_t calc_battery_percentage(int adc) {
-  /*For 3V no calculating is necassary*/
-  int battery_percentage =
-      100 * ((float)adc - VOLTAGE_MIN) / (VOLTAGE_MAX - VOLTAGE_MIN);
-
-  if (battery_percentage < 0) battery_percentage = 0;
-
-  return battery_percentage;
+  int battery_percentage = 100 * (static_cast<float>(adc) - VOLTAGE_MIN) /
+                           (VOLTAGE_MAX - VOLTAGE_MIN);
+  return battery_percentage < 0 ? 0 : battery_percentage;
+}
