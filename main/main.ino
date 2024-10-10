@@ -153,10 +153,10 @@ static void prepareTxFrame(uint8_t port) {
       appData[3] = (voltage >> 8) & 0xFF;
       appData[4] = voltage & 0xFF;
       appData[5] = battery_percentage;
+      sendBattery = false;
+      EEPROM.put(7, sendBattery);
+      EEPROM.commit();
     }
-    sendBattery = false;
-    EEPROM.put(7, sendBattery);
-    EEPROM.commit();
 
     Serial.println("Encoded Data:");
     for (int i = 0; i < appDataSize; i++) {
