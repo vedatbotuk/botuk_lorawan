@@ -33,7 +33,6 @@ uint8_t treshBattery = 1;
 uint8_t treshTemperature = 100;
 uint8_t treshHumidity = 2;
 
-// TEMPERATURE HUMIDITY
 constexpr unsigned int SENSOR_PIN{48};
 AM2302::AM2302_Sensor am2302{SENSOR_PIN};
 
@@ -75,9 +74,8 @@ uint32_t devAddr = DEV_ADDR;
 uint16_t userChannelsMask[6] = {0x0000, 0x0000, 0x00FF, 0x0000, 0x0000, 0x0000};
 
 /*LoraWan region, select in arduino IDE tools*/
-LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
 
-/*LoraWan Class, Class A and Class C are supported*/
+LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
 DeviceClass_t loraWanClass = CLASS_A;
 
 /*the application data transmission duty cycle.  value in [ms].*/
@@ -85,14 +83,8 @@ uint32_t appTxDutyCycle = 900000;  // 900000 -> 15 minutes
 
 /*OTAA or ABP*/
 bool overTheAirActivation = true;
-
-/*ADR enable*/
 bool loraWanAdr = true;
-
-/* Indicates if the node is sending confirmed or unconfirmed messages */
 bool isTxConfirmed = true;
-
-/* Application port */
 uint8_t appPort = 2;
 
 uint8_t confirmedNbTrials = 2;
@@ -106,12 +98,14 @@ static void prepareTxFrame(uint8_t port) {
   // Temperatur in int16 umwandeln, indem wir sie mit 100 multiplizieren und
   // runden
   int16_t scaledTemperature = (int16_t)(temperature * 100);
+
   Serial.printf("Temperature value = %d\n", scaledTemperature);
 
   /* HUMIDITY */
   float humidity = (float)(am2302.get_Humidity());
   uint8_t scaledHumidity =
       (uint8_t)(humidity + 0.5);  // Runden auf nächstgelegene Ganzzahl
+
   Serial.printf("Humidity value = %d\n", scaledHumidity);
 
   /* BATTERY */
@@ -182,7 +176,7 @@ static void prepareTxFrame(uint8_t port) {
     EEPROM.put(7, sendBattery);  // Write 1 byte at address 7
     EEPROM.commit();
 
-    // Ausgabe zur Überprüfung
+    // Print encoded data for verification
     Serial.println("Encoded Data:");
     for (int i = 0; i < appDataSize; i++) {
       Serial.print("appData[");
@@ -191,7 +185,7 @@ static void prepareTxFrame(uint8_t port) {
       Serial.println(appData[i], HEX);
     }
   } else {
-    Serial.println("No changes. Will not send data.");
+    Serial.println("No changes detected. Data will not be sent.");
     sendData = false;
   }
 }
@@ -210,7 +204,7 @@ void VextOFF(void) {
 void setup() {
   Serial.begin(115200);
 
-  // Initialize EEPROM with the specified size
+  // Initialize EEPROM
   EEPROM.begin(EEPROM_SIZE);
   // Read the stored current values from EEPROM
   EEPROM.get(0, currentTemperature);  // Read 2 bytes starting from address 0
@@ -295,4 +289,3 @@ uint8_t calc_battery_percentage(int adc) {
   if (battery_percentage < 0) battery_percentage = 0;
 
   return battery_percentage;
-}
