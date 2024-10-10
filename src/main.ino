@@ -17,9 +17,9 @@
 
 #include <AM2302-Sensor.h>
 #include <EEPROM.h>
+#include <LoRaWan_APP.h>
+#include <Wire.h>
 
-#include "LoRaWan_APP.h"
-#include "Wire.h"
 #include "credentials.h"
 
 constexpr uint8_t EEPROM_SIZE = 7;
@@ -27,7 +27,7 @@ constexpr uint8_t TRESH_BATTERY = 1;
 constexpr uint8_t TRESH_TEMPERATURE = 100;
 constexpr uint8_t TRESH_HUMIDITY = 2;
 constexpr unsigned int SENSOR_PIN = 48;
-constexpr uint32_t APP_TX_DUTY_CYCLE = 900000;  // 15 minutes
+constexpr uint32_t APP_TX_DUTY_CYCLE = 900000;  // 900000 -> 15 minutes
 constexpr uint8_t VOLTAGE_MAX = 3700;
 constexpr uint8_t VOLTAGE_MIN = 2900;
 
@@ -68,7 +68,7 @@ uint8_t appSKey[] = {APP_SKEY_0,  APP_SKEY_1,  APP_SKEY_2,  APP_SKEY_3,
 uint32_t devAddr = DEV_ADDR;
 
 /*LoraWan channelsmask, default channels 0-7*/
-uint16_t userChannelsMask[6] = {0x0000, 0x0000, 0x00FF, 0x0000, 0x0000, 0x0000};
+uint16_t userChannelsMask[6] = {0x00FF, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000};
 
 /*LoraWan region, select in arduino IDE tools*/
 LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
@@ -82,7 +82,7 @@ bool overTheAirActivation = true;
 bool loraWanAdr = true;
 bool isTxConfirmed = true;
 uint8_t appPort = 2;
-uint8_t confirmedNbTrials = 2;
+uint8_t confirmedNbTrials = 4;
 
 /* Prepares the payload of the frame */
 static void prepareTxFrame(uint8_t port) {
@@ -102,7 +102,7 @@ static void prepareTxFrame(uint8_t port) {
 
   // Every 48 cycles, read the battery voltage. When 15 min a cycle, it will
   // be 12 hours
-  if (cycleCount % 48 == 0) {
+  if (cycleCount % 8 == 0) {
     int16_t readValue = 0;
     for (int i = 0; i < 4; i++) {
       readValue += analogRead(3);
@@ -119,10 +119,13 @@ static void prepareTxFrame(uint8_t port) {
       sendBattery = true;
       EEPROM.put(3, voltage);
       EEPROM.put(5, currentBatteryPercentage);
+      EEPROM.put(7, sendBattery);
       EEPROM.commit();
     }
 
     cycleCount = 0;
+    EEPROM.put(6, cycleCount);
+    EEPROM.commit();
   }
   cycleCount++;
   EEPROM.put(6, cycleCount);
@@ -138,7 +141,6 @@ static void prepareTxFrame(uint8_t port) {
     currentHumidity = scaledHumidity;
     EEPROM.put(0, currentTemperature);
     EEPROM.put(2, currentHumidity);
-    EEPROM.put(7, sendBattery);
     EEPROM.commit();
 
     appDataSize = sendBattery ? 6 : 3;
@@ -153,6 +155,7 @@ static void prepareTxFrame(uint8_t port) {
       appData[3] = (voltage >> 8) & 0xFF;
       appData[4] = voltage & 0xFF;
       appData[5] = battery_percentage;
+
       sendBattery = false;
       EEPROM.put(7, sendBattery);
       EEPROM.commit();
@@ -197,7 +200,7 @@ void setup() {
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
 
   if (am2302.begin()) {
-    delay(500);
+    delay(100);
   } else {
     while (true) {
       Serial.println("Error: sensor check. => Please check sensor connection!");
