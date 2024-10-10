@@ -21,7 +21,6 @@
 #include "../credentials.h"
 #include "LoRaWan_APP.h"
 #include "Wire.h"
-#include "esp_sleep.h"  // Include the ESP32 sleep library
 
 #define EEPROM_SIZE \
   7  // 2 bytes for temperature (int16_t), 1 byte for humidity (uint8_t), 1
