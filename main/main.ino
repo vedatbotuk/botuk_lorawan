@@ -18,9 +18,9 @@
 #include <AM2302-Sensor.h>
 #include <EEPROM.h>
 
-#include "../credentials.h"
 #include "LoRaWan_APP.h"
 #include "Wire.h"
+#include "credentials.h"
 
 constexpr uint8_t EEPROM_SIZE = 7;
 constexpr uint8_t TRESH_BATTERY = 1;

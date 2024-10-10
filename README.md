@@ -69,3 +69,52 @@ To set this up:
 1. Create a copy of the `credentials_sample.h` file.
 2. Rename the new file to `credentials.h`.
 3. Edit the file and replace the `0xXX` placeholders with the correct values for your system.
+
+### Arduino CLI
+To streamline the development process, you can use the Arduino CLI for compiling and uploading your code. Below are the steps to set up and use the Arduino CLI.
+
+### Install Arduino CLI
+1. Download the Arduino CLI from the official [Arduino CLI GitHub repository](https://github.com/arduino/arduino-cli).
+2. Follow the installation instructions for your operating system.
+
+### Install Platform
+Once the Arduino CLI is installed, you need to install the platform for the Wireless Stick Lite (V3) board.
+
+```sh
+arduino-cli core update-index
+arduino-cli core install Heltec-esp32:esp32@3.0.2
+```
+
+### Install Libraries
+Install the necessary libraries for your project using the Arduino CLI.
+
+```sh
+arduino-cli lib install "AM2302-Sensor@1.4.0"
+arduino-cli lib install "EEPROM@2.0.0"
+arduino-cli lib install "Heltec ESP32 Dev-Boards@2.1.2"
+arduino-cli lib install "SPI@2.0.0"
+arduino-cli lib install "Wire@2.0.0"
+arduino-cli lib install "Adafruit GFX Library@1.11.10"
+arduino-cli lib install "Adafruit BusIO@1.16.1"
+```
+
+### Compile the Code
+To compile your code, navigate to your project directory and run:
+
+```sh
+make compile
+```
+
+### Upload the Code
+After compiling, you can upload the code to your board:
+
+```sh
+make upload
+```
+
+### Monitor Serial Output
+For debugging purposes, you can monitor the serial output from your board:
+
+```sh
+make monitor
+```
