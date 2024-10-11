@@ -20,26 +20,19 @@
 #include <LoRaWan_APP.h>
 #include <Wire.h>
 
+#include "config.h"
 #include "credentials.h"
-
-constexpr uint8_t EEPROM_SIZE = 8;
-constexpr uint8_t TRESH_BATTERY = 1;
-constexpr uint8_t TRESH_TEMPERATURE = 100;
-constexpr uint8_t TRESH_HUMIDITY = 2;
-constexpr unsigned int SENSOR_PIN = 48;
-constexpr uint32_t APP_TX_DUTY_CYCLE = 900000;  // 900000 -> 15 minutes
-constexpr uint16_t VOLTAGE_MAX = 3700;
-constexpr uint16_t VOLTAGE_MIN = 2900;
 
 AM2302::AM2302_Sensor am2302{SENSOR_PIN};
 
+constexpr uint8_t EEPROM_SIZE = 8;
 int16_t currentTemperature = 2500;
 uint8_t currentHumidity = 50;
 uint16_t voltage = 3700;
 uint8_t currentBatteryPercentage = 100;
 uint8_t cycleCount = 0;
 bool sendData = true;
-bool sendBattery;
+bool sendBattery = true;
 
 /* OTAA para*/
 uint8_t devEui[] = {DEV_EUI_0, DEV_EUI_1, DEV_EUI_2, DEV_EUI_3,
@@ -87,50 +80,12 @@ uint8_t confirmedNbTrials = 4;
 static void prepareTxFrame(uint8_t port) {
   auto status = am2302.read();
 
-  /* TEMPERATURE */
-  float temperature = static_cast<float>(am2302.get_Temperature());
-  int16_t scaledTemperature = static_cast<int16_t>(temperature * 100);
-  Serial.printf("Temperature value = %d\n", scaledTemperature);
-
-  /* HUMIDITY */
-  float humidity = static_cast<float>(am2302.get_Humidity());
-  uint8_t scaledHumidity = static_cast<uint8_t>(humidity + 0.5);
-  Serial.printf("Humidity value = %d\n", scaledHumidity);
+  /* TEMPERATURE and HUMIDITY */
+  int16_t scaledTemperature = readTemperature();
+  uint8_t scaledHumidity = readHumidity();
 
   /* BATTERY */
-  uint8_t battery_percentage = 0;
-
-  // Every 48 cycles, read the battery voltage. When 15 min a cycle, it will
-  // be 12 hours
-  if (cycleCount % 48 == 0) {
-    int16_t readValue = 0;
-    for (int i = 0; i < 4; i++) {
-      readValue += analogRead(3);
-      delay(100);
-    }
-    voltage = readValue / 4;
-    battery_percentage = calc_battery_percentage(voltage);
-
-    Serial.printf("ADC millivolts value = %d\n", voltage);
-    Serial.printf("Battery percentage = %d\n", battery_percentage);
-
-    if (fabs(currentBatteryPercentage - battery_percentage) >= TRESH_BATTERY) {
-      currentBatteryPercentage = battery_percentage;
-      sendBattery = true;
-      EEPROM.write(3, voltage);
-      EEPROM.write(5, currentBatteryPercentage);
-      EEPROM.write(7, sendBattery);
-      EEPROM.commit();
-    }
-
-    cycleCount = 0;
-  }
-  cycleCount++;
-  EEPROM.write(6, cycleCount);
-  EEPROM.commit();
-
-  Serial.printf("cycleCount value = %d\n", cycleCount);
-  Serial.printf("sendBattery value = %d\n", sendBattery);
+  readBattery();
 
   if (fabs(currentTemperature - scaledTemperature) >= TRESH_TEMPERATURE ||
       fabs(currentHumidity - scaledHumidity) >= TRESH_HUMIDITY) {
@@ -247,6 +202,56 @@ void loop() {
       deviceState = DEVICE_STATE_INIT;
       break;
   }
+}
+
+int16_t readTemperature() {
+  float temperature = static_cast<float>(am2302.get_Temperature());
+  int16_t scaledTemperature = static_cast<int16_t>(temperature * 100);
+  Serial.printf("Temperature value = %d\n", scaledTemperature);
+  return scaledTemperature;
+}
+
+uint8_t readHumidity() {
+  float humidity = static_cast<float>(am2302.get_Humidity());
+  uint8_t scaledHumidity = static_cast<uint8_t>(humidity + 0.5);
+  Serial.printf("Humidity value = %d\n", scaledHumidity);
+  return scaledHumidity;
+}
+
+void readBattery() {
+  uint8_t battery_percentage = 0;
+
+  // Every 48 cycles, read the battery voltage. When 15 min a cycle, it will
+  // be 12 hours
+  if (cycleCount % BATTERY_READ_INTERVAL_CYCLES == 0) {
+    int16_t readValue = 0;
+    for (int i = 0; i < 4; i++) {
+      readValue += analogRead(BATTERY_PIN);
+      delay(100);
+    }
+    voltage = readValue / 4;
+    battery_percentage = calc_battery_percentage(voltage);
+
+    Serial.printf("ADC millivolts value = %d\n", voltage);
+    Serial.printf("Battery percentage = %d\n", battery_percentage);
+
+    if (fabs(currentBatteryPercentage - battery_percentage) >= TRESH_BATTERY) {
+      currentBatteryPercentage = battery_percentage;
+      sendBattery = true;
+      EEPROM.write(3, voltage);
+      EEPROM.write(5, currentBatteryPercentage);
+      EEPROM.write(7, sendBattery);
+      EEPROM.commit();
+    }
+
+    cycleCount = 0;
+  }
+  cycleCount++;
+  EEPROM.write(6, cycleCount);
+  EEPROM.commit();
+
+  Serial.printf("cycleCount value = %d\n", cycleCount);
+  Serial.printf("sendBattery value = %d\n", sendBattery);
 }
 
 uint8_t calc_battery_percentage(uint16_t adc) {
