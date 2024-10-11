@@ -20,8 +20,8 @@ compile:
 
 # Upload the sketch to the board
 upload:
-	@echo "Compiling and uploading the sketch to the board..."
-	$(ARDUINO_CLI) compile --fqbn $(BOARD) $(SKETCH) && $(ARDUINO_CLI) upload -p $(PORT) --fqbn $(BOARD) $(SKETCH)
+	@echo "Uploading the sketch to the board..."
+	$(ARDUINO_CLI) upload -p $(PORT) --fqbn $(BOARD) $(SKETCH)
 	@echo "Upload complete."
 
 # Monitor the serial output
