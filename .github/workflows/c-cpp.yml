@@ -29,17 +29,12 @@ jobs:
         run: |
           arduino-cli core update-index
           arduino-cli config init
-          arduino-cli config add board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-          arduino-cli core update-index
-          arduino-cli core install esp32:esp32
+          arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/Heltec-Aaron-Lee/WiFi_Kit_series/refs/heads/master/package.json
 
       # Schritt 4: Arduino-Bibliotheken installieren
       - name: Install Arduino Libraries
         run: |
           arduino-cli lib install "AM2302-Sensor@1.4.0"
-          arduino-cli lib install "Heltec ESP32 Dev-Boards@2.1.2"
-          arduino-cli lib install "SPI@2.0.0"
-          arduino-cli lib install "Wire@2.0.0"
           arduino-cli lib install "Adafruit GFX Library@1.11.10"
           arduino-cli lib install "Adafruit BusIO@1.16.1"
 
