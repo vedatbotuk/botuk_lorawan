@@ -37,7 +37,6 @@ jobs:
       - name: Install Arduino Libraries
         run: |
           arduino-cli lib install "AM2302-Sensor@1.4.0"
-          arduino-cli lib install "EEPROM@2.0.0"
           arduino-cli lib install "Heltec ESP32 Dev-Boards@2.1.2"
           arduino-cli lib install "SPI@2.0.0"
           arduino-cli lib install "Wire@2.0.0"
