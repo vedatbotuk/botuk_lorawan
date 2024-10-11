@@ -24,11 +24,14 @@ jobs:
           tar -xvzf arduino-cli_latest_Linux_64bit.tar.gz
           sudo mv arduino-cli /usr/local/bin/
 
-      # Schritt 3: Heltec ESP32 Core installieren
-      - name: Install Heltec ESP32 Core
+      # Schritt 3: ESP32 Core URL hinzufügen und installieren
+      - name: Set up ESP32 core
         run: |
           arduino-cli core update-index
-          arduino-cli core install Heltec-esp32:esp32@3.0.2
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32
 
       # Schritt 4: Arduino-Bibliotheken installieren
       - name: Install Arduino Libraries
