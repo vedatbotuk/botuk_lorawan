@@ -22,23 +22,22 @@
 
 #include "credentials.h"
 
-constexpr uint8_t EEPROM_SIZE = 7;
+constexpr uint8_t EEPROM_SIZE = 8;
 constexpr uint8_t TRESH_BATTERY = 1;
-constexpr uint8_t TRESH_TEMPERATURE = 100;
+constexpr uint8_t TRESH_TEMPERATURE = 50;
 constexpr uint8_t TRESH_HUMIDITY = 2;
 constexpr unsigned int SENSOR_PIN = 48;
-constexpr uint32_t APP_TX_DUTY_CYCLE = 900000;  // 900000 -> 15 minutes
-constexpr uint8_t VOLTAGE_MAX = 3700;
-constexpr uint8_t VOLTAGE_MIN = 2900;
+constexpr uint32_t APP_TX_DUTY_CYCLE = 60000;  // 900000 -> 15 minutes
+constexpr uint16_t VOLTAGE_MAX = 3700;
+constexpr uint16_t VOLTAGE_MIN = 2900;
 
 AM2302::AM2302_Sensor am2302{SENSOR_PIN};
 
-int16_t currentTemperature;
-uint8_t currentHumidity;
-int16_t voltage;
-uint8_t currentBatteryPercentage;
-uint8_t battery_percentage;
-uint8_t cycleCount;
+int16_t currentTemperature = 2500;
+uint8_t currentHumidity = 50;
+uint16_t voltage = 3700;
+uint8_t currentBatteryPercentage = 100;
+uint8_t cycleCount = 0;
 bool sendData = true;
 bool sendBattery;
 
@@ -99,10 +98,11 @@ static void prepareTxFrame(uint8_t port) {
   Serial.printf("Humidity value = %d\n", scaledHumidity);
 
   /* BATTERY */
+  uint8_t battery_percentage = 0;
 
   // Every 48 cycles, read the battery voltage. When 15 min a cycle, it will
   // be 12 hours
-  if (cycleCount % 8 == 0) {
+  if (cycleCount % 10 == 0) {
     int16_t readValue = 0;
     for (int i = 0; i < 4; i++) {
       readValue += analogRead(3);
@@ -117,18 +117,16 @@ static void prepareTxFrame(uint8_t port) {
     if (fabs(currentBatteryPercentage - battery_percentage) >= TRESH_BATTERY) {
       currentBatteryPercentage = battery_percentage;
       sendBattery = true;
-      EEPROM.put(3, voltage);
-      EEPROM.put(5, currentBatteryPercentage);
-      EEPROM.put(7, sendBattery);
+      EEPROM.write(3, voltage);
+      EEPROM.write(5, currentBatteryPercentage);
+      EEPROM.write(7, sendBattery);
       EEPROM.commit();
     }
 
     cycleCount = 0;
-    EEPROM.put(6, cycleCount);
-    EEPROM.commit();
   }
   cycleCount++;
-  EEPROM.put(6, cycleCount);
+  EEPROM.write(6, cycleCount);
   EEPROM.commit();
 
   Serial.printf("cycleCount value = %d\n", cycleCount);
@@ -139,8 +137,8 @@ static void prepareTxFrame(uint8_t port) {
     sendData = true;
     currentTemperature = scaledTemperature;
     currentHumidity = scaledHumidity;
-    EEPROM.put(0, currentTemperature);
-    EEPROM.put(2, currentHumidity);
+    EEPROM.write(0, currentTemperature);
+    EEPROM.write(2, currentHumidity);
     EEPROM.commit();
 
     appDataSize = sendBattery ? 6 : 3;
@@ -154,10 +152,10 @@ static void prepareTxFrame(uint8_t port) {
     if (sendBattery) {
       appData[3] = (voltage >> 8) & 0xFF;
       appData[4] = voltage & 0xFF;
-      appData[5] = battery_percentage;
+      appData[5] = currentBatteryPercentage;
 
       sendBattery = false;
-      EEPROM.put(7, sendBattery);
+      EEPROM.write(7, sendBattery);
       EEPROM.commit();
     }
 
@@ -195,6 +193,9 @@ void setup() {
   Serial.printf("Stored Temperature: %d\n", currentTemperature);
   Serial.printf("Stored Humidity: %d\n", currentHumidity);
   Serial.printf("Stored Battery Percentage: %d\n", currentBatteryPercentage);
+  Serial.printf("Stored Voltage: %d\n", voltage);
+  Serial.printf("Stored Cycle Count: %d\n", cycleCount);
+  Serial.printf("Stored Send Battery: %d\n", sendBattery);
 
   analogReadResolution(12);
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
@@ -248,8 +249,14 @@ void loop() {
   }
 }
 
-uint8_t calc_battery_percentage(int adc) {
-  int battery_percentage = 100 * (static_cast<float>(adc) - VOLTAGE_MIN) /
-                           (VOLTAGE_MAX - VOLTAGE_MIN);
-  return battery_percentage < 0 ? 0 : battery_percentage;
+uint8_t calc_battery_percentage(uint16_t adc) {
+  if (adc < VOLTAGE_MIN) {
+    return 0;
+  } else if (adc > VOLTAGE_MAX) {
+    return 100;
+  } else {
+    int battery_percentage = 100 * (static_cast<float>(adc) - VOLTAGE_MIN) /
+                             (VOLTAGE_MAX - VOLTAGE_MIN);
+    return battery_percentage < 0 ? 0 : battery_percentage;
+  }
 }
