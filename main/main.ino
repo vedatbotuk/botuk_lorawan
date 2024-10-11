@@ -24,10 +24,10 @@
 
 constexpr uint8_t EEPROM_SIZE = 8;
 constexpr uint8_t TRESH_BATTERY = 1;
-constexpr uint8_t TRESH_TEMPERATURE = 50;
+constexpr uint8_t TRESH_TEMPERATURE = 100;
 constexpr uint8_t TRESH_HUMIDITY = 2;
 constexpr unsigned int SENSOR_PIN = 48;
-constexpr uint32_t APP_TX_DUTY_CYCLE = 60000;  // 900000 -> 15 minutes
+constexpr uint32_t APP_TX_DUTY_CYCLE = 900000;  // 900000 -> 15 minutes
 constexpr uint16_t VOLTAGE_MAX = 3700;
 constexpr uint16_t VOLTAGE_MIN = 2900;
 
@@ -102,7 +102,7 @@ static void prepareTxFrame(uint8_t port) {
 
   // Every 48 cycles, read the battery voltage. When 15 min a cycle, it will
   // be 12 hours
-  if (cycleCount % 10 == 0) {
+  if (cycleCount % 48 == 0) {
     int16_t readValue = 0;
     for (int i = 0; i < 4; i++) {
       readValue += analogRead(3);
