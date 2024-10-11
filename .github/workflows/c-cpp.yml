@@ -30,7 +30,8 @@ jobs:
           arduino-cli core update-index
           arduino-cli config init
           arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/Heltec-Aaron-Lee/WiFi_Kit_series/refs/heads/master/package.json
-
+          arduino-cli core install Heltec-esp32:esp32@3.0.2
+          
       # Schritt 4: Arduino-Bibliotheken installieren
       - name: Install Arduino Libraries
         run: |
