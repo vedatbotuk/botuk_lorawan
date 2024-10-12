@@ -92,8 +92,8 @@ static void prepareTxFrame(uint8_t port) {
     sendData = true;
     currentTemperature = scaledTemperature;
     currentHumidity = scaledHumidity;
-    EEPROM.write(0, currentTemperature);
-    EEPROM.write(2, currentHumidity);
+    EEPROM.put(0, currentTemperature);
+    EEPROM.put(2, currentHumidity);
     EEPROM.commit();
 
     appDataSize = sendBattery ? 6 : 3;
@@ -110,7 +110,7 @@ static void prepareTxFrame(uint8_t port) {
       appData[5] = currentBatteryPercentage;
 
       sendBattery = false;
-      EEPROM.write(7, sendBattery);
+      EEPROM.put(7, sendBattery);
       EEPROM.commit();
     }
 
@@ -122,16 +122,6 @@ static void prepareTxFrame(uint8_t port) {
     Serial.println("No changes detected. Data will not be sent.");
     sendData = false;
   }
-}
-
-void VextON() {
-  pinMode(Vext, OUTPUT);
-  digitalWrite(Vext, LOW);
-}
-
-void VextOFF() {
-  pinMode(Vext, OUTPUT);
-  digitalWrite(Vext, HIGH);
 }
 
 void setup() {
@@ -238,16 +228,16 @@ void readBattery() {
     if (fabs(currentBatteryPercentage - battery_percentage) >= TRESH_BATTERY) {
       currentBatteryPercentage = battery_percentage;
       sendBattery = true;
-      EEPROM.write(3, voltage);
-      EEPROM.write(5, currentBatteryPercentage);
-      EEPROM.write(7, sendBattery);
+      EEPROM.put(3, voltage);
+      EEPROM.put(5, currentBatteryPercentage);
+      EEPROM.put(7, sendBattery);
       EEPROM.commit();
     }
 
     cycleCount = 0;
   }
   cycleCount++;
-  EEPROM.write(6, cycleCount);
+  EEPROM.put(6, cycleCount);
   EEPROM.commit();
 
   Serial.printf("cycleCount value = %d\n", cycleCount);

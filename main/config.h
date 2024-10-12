@@ -11,7 +11,7 @@ constexpr unsigned int BATTERY_PIN = 3;
 // on next wake up. Battery data will be sent only when temperature or humidity
 // data will be sent.
 constexpr uint8_t TRESH_BATTERY = 1;
-constexpr uint8_t TRESH_TEMPERATURE = 100;
+constexpr int16_t TRESH_TEMPERATURE = 100;
 constexpr uint8_t TRESH_HUMIDITY = 2;
 
 // Maximum ADC value for battery measurement (in millivolts)
