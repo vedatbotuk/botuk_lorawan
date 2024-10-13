@@ -12,7 +12,7 @@ constexpr unsigned int BATTERY_PIN = 3;
 // data will be sent.
 constexpr uint8_t TRESH_BATTERY = 1;
 constexpr int16_t TRESH_TEMPERATURE = 100;
-constexpr uint8_t TRESH_HUMIDITY = 2;
+constexpr uint8_t TRESH_HUMIDITY = 4;
 
 // Maximum ADC value for battery measurement (in millivolts)
 constexpr uint16_t VOLTAGE_MAX = 3700;
