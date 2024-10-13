@@ -19,7 +19,7 @@
         "~/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/variants/heltec_wifi_lora_32_V3/",
         "~/.arduino15/packages/Heltec-esp32/hardware/esp32/3.0.2/libraries/Wire/src/",
         "~/Arduino/libraries/AM2302-Sensor/src",
-        "~/Arduino/libraries/Heltec_ESP32-master/src"
+        "~/Arduino/libraries/Heltec_ESP32/src"
       ],
       "defines": [
         "ESP32",
