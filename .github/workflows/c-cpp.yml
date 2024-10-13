@@ -38,6 +38,7 @@ jobs:
           arduino-cli lib install "AM2302-Sensor@1.4.0"
           arduino-cli lib install "Adafruit GFX Library@1.11.10"
           arduino-cli lib install "Adafruit BusIO@1.16.1"
+          arduino-cli lib install "Heltec ESP32 Dev-Boards"
 
       # Schritt 5: Kompilieren des Arduino Sketches
       - name: Compile Sketch
