@@ -25,8 +25,8 @@
 
 AM2302::AM2302_Sensor am2302{SENSOR_PIN};
 
-constexpr uint8_t EEPROM_SIZE = 6;
-int16_t currentTemperature = 2500;
+constexpr uint8_t EEPROM_SIZE = 5;
+uint8_t currentTemperature = 2500;
 uint8_t currentHumidity = 50;
 uint8_t currentBatteryPercentage = 100;
 uint8_t cycleCount = 0;
@@ -80,7 +80,7 @@ static void prepareTxFrame(uint8_t port) {
   auto status = am2302.read();
 
   /* TEMPERATURE and HUMIDITY */
-  int16_t scaledTemperature = readTemperature();
+  uint8_t scaledTemperature = readTemperature();
   uint8_t scaledHumidity = readHumidity();
 
   /* BATTERY */
@@ -92,22 +92,21 @@ static void prepareTxFrame(uint8_t port) {
     currentTemperature = scaledTemperature;
     currentHumidity = scaledHumidity;
     EEPROM.put(0, currentTemperature);
-    EEPROM.put(2, currentHumidity);
+    EEPROM.put(1, currentHumidity);
     EEPROM.commit();
 
-    appDataSize = sendBattery ? 4 : 3;
+    appDataSize = sendBattery ? 3 : 2;
     Serial.println(sendBattery ? "Battery data will be sent."
                                : "Battery data will not be sent.");
 
-    appData[0] = (currentTemperature >> 8) & 0xFF;
-    appData[1] = currentTemperature & 0xFF;
-    appData[2] = currentHumidity;
+    appData[0] = currentTemperature;
+    appData[1] = currentHumidity;
 
     if (sendBattery) {
       appData[3] = currentBatteryPercentage;
 
       sendBattery = false;
-      EEPROM.put(5, sendBattery);
+      EEPROM.put(4, sendBattery);
       EEPROM.commit();
     }
 
@@ -126,10 +125,10 @@ void setup() {
 
   EEPROM.begin(EEPROM_SIZE);
   EEPROM.get(0, currentTemperature);
-  EEPROM.get(2, currentHumidity);
-  EEPROM.get(3, currentBatteryPercentage);
-  EEPROM.get(4, cycleCount);
-  EEPROM.get(5, sendBattery);
+  EEPROM.get(1, currentHumidity);
+  EEPROM.get(2, currentBatteryPercentage);
+  EEPROM.get(3, cycleCount);
+  EEPROM.get(4, sendBattery);
 
   Serial.printf("Stored Temperature: %d\n", currentTemperature);
   Serial.printf("Stored Humidity: %d\n", currentHumidity);
@@ -189,11 +188,28 @@ void loop() {
   }
 }
 
-int16_t readTemperature() {
+uint8_t readTemperature() {
   float temperature = static_cast<float>(am2302.get_Temperature());
-  int16_t scaledTemperature = static_cast<int16_t>(temperature * 100);
+  uint8_t scaledTemperature = temperature_to_uint8(temperature);
   Serial.printf("Temperature value = %d\n", scaledTemperature);
   return scaledTemperature;
+}
+
+// Function to map float temperature to uint8_t (0 to 255)
+uint8_t temperature_to_uint8(float temperature) {
+  // Define your min and max temperatures corresponding to 0 and 255
+  float min_temp = -20.0;  // Corresponds to 0
+  float max_temp = 50.0;   // Corresponds to 255
+
+  // Clamp temperature within the valid range
+  if (temperature < min_temp) temperature = min_temp;
+  if (temperature > max_temp) temperature = max_temp;
+
+  // Perform the linear mapping
+  uint8_t result =
+      (uint8_t)(((temperature - min_temp) / (max_temp - min_temp)) * 255.0);
+
+  return result;
 }
 
 uint8_t readHumidity() {
@@ -223,15 +239,15 @@ void readBattery() {
     if (fabs(currentBatteryPercentage - battery_percentage) >= TRESH_BATTERY) {
       currentBatteryPercentage = battery_percentage;
       sendBattery = true;
-      EEPROM.put(3, currentBatteryPercentage);
-      EEPROM.put(5, sendBattery);
+      EEPROM.put(2, currentBatteryPercentage);
+      EEPROM.put(4, sendBattery);
       EEPROM.commit();
     }
 
     cycleCount = 0;
   }
   cycleCount++;
-  EEPROM.put(4, cycleCount);
+  EEPROM.put(3, cycleCount);
   EEPROM.commit();
 
   Serial.printf("cycleCount value = %d\n", cycleCount);
