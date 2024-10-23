@@ -25,10 +25,9 @@
 
 AM2302::AM2302_Sensor am2302{SENSOR_PIN};
 
-constexpr uint8_t EEPROM_SIZE = 7;
+constexpr uint8_t EEPROM_SIZE = 5;
 uint8_t currentTemperature = 2500;
 uint8_t currentHumidity = 50;
-uint16_t voltage = 3700;
 uint8_t currentBatteryPercentage = 100;
 uint8_t cycleCount = 0;
 bool sendData = true;
@@ -96,7 +95,7 @@ static void prepareTxFrame(uint8_t port) {
     EEPROM.put(1, currentHumidity);
     EEPROM.commit();
 
-    appDataSize = sendBattery ? 5 : 2;
+    appDataSize = sendBattery ? 3 : 2;
     Serial.println(sendBattery ? "Battery data will be sent."
                                : "Battery data will not be sent.");
 
@@ -104,12 +103,10 @@ static void prepareTxFrame(uint8_t port) {
     appData[1] = currentHumidity;
 
     if (sendBattery) {
-      appData[3] = (voltage >> 8) & 0xFF;
-      appData[4] = voltage & 0xFF;
-      appData[5] = currentBatteryPercentage;
+      appData[3] = currentBatteryPercentage;
 
       sendBattery = false;
-      EEPROM.put(6, sendBattery);
+      EEPROM.put(4, sendBattery);
       EEPROM.commit();
     }
 
@@ -129,15 +126,13 @@ void setup() {
   EEPROM.begin(EEPROM_SIZE);
   EEPROM.get(0, currentTemperature);
   EEPROM.get(1, currentHumidity);
-  EEPROM.get(2, voltage);
-  EEPROM.get(4, currentBatteryPercentage);
-  EEPROM.get(5, cycleCount);
-  EEPROM.get(6, sendBattery);
+  EEPROM.get(2, currentBatteryPercentage);
+  EEPROM.get(3, cycleCount);
+  EEPROM.get(4, sendBattery);
 
   Serial.printf("Stored Temperature: %d\n", currentTemperature);
   Serial.printf("Stored Humidity: %d\n", currentHumidity);
   Serial.printf("Stored Battery Percentage: %d\n", currentBatteryPercentage);
-  Serial.printf("Stored Voltage: %d\n", voltage);
   Serial.printf("Stored Cycle Count: %d\n", cycleCount);
   Serial.printf("Stored Send Battery: %d\n", sendBattery);
 
@@ -235,7 +230,7 @@ void readBattery() {
       readValue += analogRead(BATTERY_PIN);
       delay(100);
     }
-    voltage = readValue / 4;
+    uint16_t voltage = readValue / 4;
     battery_percentage = calc_battery_percentage(voltage);
 
     Serial.printf("ADC millivolts value = %d\n", voltage);
@@ -244,16 +239,15 @@ void readBattery() {
     if (fabs(currentBatteryPercentage - battery_percentage) >= TRESH_BATTERY) {
       currentBatteryPercentage = battery_percentage;
       sendBattery = true;
-      EEPROM.put(2, voltage);
-      EEPROM.put(4, currentBatteryPercentage);
-      EEPROM.put(6, sendBattery);
+      EEPROM.put(2, currentBatteryPercentage);
+      EEPROM.put(4, sendBattery);
       EEPROM.commit();
     }
 
     cycleCount = 0;
   }
   cycleCount++;
-  EEPROM.put(5, cycleCount);
+  EEPROM.put(3, cycleCount);
   EEPROM.commit();
 
   Serial.printf("cycleCount value = %d\n", cycleCount);
