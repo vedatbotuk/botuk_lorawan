@@ -26,12 +26,38 @@
 AM2302::AM2302_Sensor am2302{SENSOR_PIN};
 
 constexpr uint8_t EEPROM_SIZE = 5;
-uint8_t currentTemperature = 2500;
-uint8_t currentHumidity = 50;
+
+enum EEPROMAddress : uint8_t {
+  EEPROM_ADDR_TEMPERATURE = 0,
+  EEPROM_ADDR_HUMIDITY = 1,
+  EEPROM_ADDR_BATTERY_PERCENT = 2,
+  EEPROM_ADDR_CYCLE_COUNT = 3,
+  EEPROM_ADDR_SEND_BATTERY = 4,
+};
+
+uint8_t currentTemperature = 0;
+uint8_t currentHumidity = 0;
 uint8_t currentBatteryPercentage = 100;
 uint8_t cycleCount = 0;
-bool sendData = true;
+bool sendData = false;
 bool sendBattery = true;
+
+static void saveMeasurementState() {
+  EEPROM.put(EEPROM_ADDR_TEMPERATURE, currentTemperature);
+  EEPROM.put(EEPROM_ADDR_HUMIDITY, currentHumidity);
+  EEPROM.commit();
+}
+
+static void saveBatteryState() {
+  EEPROM.put(EEPROM_ADDR_BATTERY_PERCENT, currentBatteryPercentage);
+  EEPROM.put(EEPROM_ADDR_SEND_BATTERY, sendBattery);
+  EEPROM.commit();
+}
+
+static void saveCycleCount() {
+  EEPROM.put(EEPROM_ADDR_CYCLE_COUNT, cycleCount);
+  EEPROM.commit();
+}
 
 /* OTAA para*/
 uint8_t devEui[] = {DEV_EUI_0, DEV_EUI_1, DEV_EUI_2, DEV_EUI_3,
@@ -77,46 +103,47 @@ uint8_t confirmedNbTrials = 4;
 
 /* Prepares the payload of the frame */
 static void prepareTxFrame(uint8_t port) {
-  auto status = am2302.read();
+  if (!am2302.read()) {
+    Serial.println("Warning: failed to read sensor. Skipping transmission.");
+    sendData = false;
+    return;
+  }
 
-  /* TEMPERATURE and HUMIDITY */
   uint8_t scaledTemperature = readTemperature();
   uint8_t scaledHumidity = readHumidity();
-
-  /* BATTERY */
   readBattery();
 
-  if (fabs(currentTemperature - scaledTemperature) >= TRESH_TEMPERATURE ||
-      fabs(currentHumidity - scaledHumidity) >= TRESH_HUMIDITY) {
-    sendData = true;
-    currentTemperature = scaledTemperature;
-    currentHumidity = scaledHumidity;
-    EEPROM.put(0, currentTemperature);
-    EEPROM.put(1, currentHumidity);
-    EEPROM.commit();
+  bool temperatureChanged = abs(currentTemperature - scaledTemperature) >= THRESH_TEMPERATURE;
+  bool humidityChanged = abs(currentHumidity - scaledHumidity) >= THRESH_HUMIDITY;
 
-    appDataSize = sendBattery ? 3 : 2;
-    Serial.println(sendBattery ? "Battery data will be sent."
-                               : "Battery data will not be sent.");
-
-    appData[0] = currentTemperature;
-    appData[1] = currentHumidity;
-
-    if (sendBattery) {
-      appData[3] = currentBatteryPercentage;
-
-      sendBattery = false;
-      EEPROM.put(4, sendBattery);
-      EEPROM.commit();
-    }
-
-    Serial.println("Encoded Data:");
-    for (int i = 0; i < appDataSize; i++) {
-      Serial.printf("appData[%d] = %02X\n", i, appData[i]);
-    }
-  } else {
+  if (!temperatureChanged && !humidityChanged) {
     Serial.println("No changes detected. Data will not be sent.");
     sendData = false;
+    return;
+  }
+
+  sendData = true;
+  currentTemperature = scaledTemperature;
+  currentHumidity = scaledHumidity;
+  saveMeasurementState();
+
+  appData[0] = currentTemperature;
+  appData[1] = currentHumidity;
+  appDataSize = 2;
+
+  if (sendBattery) {
+    appData[2] = currentBatteryPercentage;
+    appDataSize = 3;
+    sendBattery = false;
+    saveBatteryState();
+    Serial.println("Battery data will be sent.");
+  } else {
+    Serial.println("Battery data will not be sent.");
+  }
+
+  Serial.println("Encoded Data:");
+  for (int i = 0; i < appDataSize; i++) {
+    Serial.printf("appData[%d] = %02X\n", i, appData[i]);
   }
 }
 
@@ -124,17 +151,28 @@ void setup() {
   Serial.begin(115200);
 
   EEPROM.begin(EEPROM_SIZE);
-  EEPROM.get(0, currentTemperature);
-  EEPROM.get(1, currentHumidity);
-  EEPROM.get(2, currentBatteryPercentage);
-  EEPROM.get(3, cycleCount);
-  EEPROM.get(4, sendBattery);
+  EEPROM.get(EEPROM_ADDR_TEMPERATURE, currentTemperature);
+  EEPROM.get(EEPROM_ADDR_HUMIDITY, currentHumidity);
+  EEPROM.get(EEPROM_ADDR_BATTERY_PERCENT, currentBatteryPercentage);
+  EEPROM.get(EEPROM_ADDR_CYCLE_COUNT, cycleCount);
+  EEPROM.get(EEPROM_ADDR_SEND_BATTERY, sendBattery);
 
-  Serial.printf("Stored Temperature: %d\n", currentTemperature);
-  Serial.printf("Stored Humidity: %d\n", currentHumidity);
-  Serial.printf("Stored Battery Percentage: %d\n", currentBatteryPercentage);
-  Serial.printf("Stored Cycle Count: %d\n", cycleCount);
-  Serial.printf("Stored Send Battery: %d\n", sendBattery);
+  if (currentHumidity > 100) {
+    currentHumidity = 0;
+  }
+  if (currentBatteryPercentage > 100) {
+    currentBatteryPercentage = 100;
+  }
+  if (cycleCount >= BATTERY_READ_INTERVAL_CYCLES) {
+    cycleCount %= BATTERY_READ_INTERVAL_CYCLES;
+    saveCycleCount();
+  }
+
+  Serial.printf("Stored Temperature: %u\n", currentTemperature);
+  Serial.printf("Stored Humidity: %u\n", currentHumidity);
+  Serial.printf("Stored Battery Percentage: %u\n", currentBatteryPercentage);
+  Serial.printf("Stored Cycle Count: %u\n", cycleCount);
+  Serial.printf("Stored Send Battery: %u\n", sendBattery);
 
   analogReadResolution(12);
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
@@ -191,31 +229,25 @@ void loop() {
 uint8_t readTemperature() {
   float temperature = static_cast<float>(am2302.get_Temperature());
   uint8_t scaledTemperature = temperature_to_uint8(temperature);
-  Serial.printf("Temperature value = %d\n", scaledTemperature);
+  Serial.printf("Temperature value = %u\n", scaledTemperature);
   return scaledTemperature;
 }
 
-// Function to map float temperature to uint8_t (0 to 255)
 uint8_t temperature_to_uint8(float temperature) {
-  // Define your min and max temperatures corresponding to 0 and 255
-  float min_temp = -20.0;  // Corresponds to 0
-  float max_temp = 50.0;   // Corresponds to 255
+  if (temperature < TEMPERATURE_MIN) {
+    temperature = TEMPERATURE_MIN;
+  } else if (temperature > TEMPERATURE_MAX) {
+    temperature = TEMPERATURE_MAX;
+  }
 
-  // Clamp temperature within the valid range
-  if (temperature < min_temp) temperature = min_temp;
-  if (temperature > max_temp) temperature = max_temp;
-
-  // Perform the linear mapping
-  uint8_t result =
-      (uint8_t)(((temperature - min_temp) / (max_temp - min_temp)) * 255.0);
-
-  return result;
+  float normalized = (temperature - TEMPERATURE_MIN) / (TEMPERATURE_MAX - TEMPERATURE_MIN);
+  return static_cast<uint8_t>(normalized * 255.0f + 0.5f);
 }
 
 uint8_t readHumidity() {
   float humidity = static_cast<float>(am2302.get_Humidity());
-  uint8_t scaledHumidity = static_cast<uint8_t>(humidity + 0.5);
-  Serial.printf("Humidity value = %d\n", scaledHumidity);
+  uint8_t scaledHumidity = static_cast<uint8_t>(humidity + 0.5f);
+  Serial.printf("Humidity value = %u\n", scaledHumidity);
   return scaledHumidity;
 }
 
@@ -225,33 +257,30 @@ void readBattery() {
   // Every 48 cycles, read the battery voltage. When 15 min a cycle, it will
   // be 12 hours
   if (cycleCount % BATTERY_READ_INTERVAL_CYCLES == 0) {
-    int16_t readValue = 0;
+    int32_t readValue = 0;
     for (int i = 0; i < 4; i++) {
       readValue += analogRead(BATTERY_PIN);
       delay(100);
     }
-    uint16_t voltage = readValue / 4;
+    uint16_t voltage = static_cast<uint16_t>(readValue / 4);
     battery_percentage = calc_battery_percentage(voltage);
 
-    Serial.printf("ADC millivolts value = %d\n", voltage);
-    Serial.printf("Battery percentage = %d\n", battery_percentage);
+    Serial.printf("ADC millivolts value = %u\n", voltage);
+    Serial.printf("Battery percentage = %u\n", battery_percentage);
 
-    if (fabs(currentBatteryPercentage - battery_percentage) >= TRESH_BATTERY) {
+    if (abs(static_cast<int>(currentBatteryPercentage) - static_cast<int>(battery_percentage)) >= THRESH_BATTERY) {
       currentBatteryPercentage = battery_percentage;
       sendBattery = true;
-      EEPROM.put(2, currentBatteryPercentage);
-      EEPROM.put(4, sendBattery);
-      EEPROM.commit();
+      saveBatteryState();
     }
 
     cycleCount = 0;
   }
-  cycleCount++;
-  EEPROM.put(3, cycleCount);
-  EEPROM.commit();
+  cycleCount = (cycleCount + 1) % BATTERY_READ_INTERVAL_CYCLES;
+  saveCycleCount();
 
-  Serial.printf("cycleCount value = %d\n", cycleCount);
-  Serial.printf("sendBattery value = %d\n", sendBattery);
+  Serial.printf("cycleCount value = %u\n", cycleCount);
+  Serial.printf("sendBattery value = %u\n", sendBattery);
 }
 
 uint8_t calc_battery_percentage(uint16_t adc) {
